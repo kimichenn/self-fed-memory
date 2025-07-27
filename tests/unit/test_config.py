@@ -1,16 +1,10 @@
-import os
+import pytest
+
 from app.core.config import Settings
+from tests.helpers import get_test_settings
 
 
-def get_test_settings() -> Settings:
-    """Returns a Settings instance for testing.
-
-    Automatically uses TEST_PINECONE_INDEX and TEST_EMBEDDING_MODEL
-    environment variables when available.
-    """
-    return Settings.for_testing()
-
-
+@pytest.mark.unit
 def test_test_settings_use_test_env_vars(monkeypatch):
     """Test that test settings properly use TEST_* environment variables."""
     # Set test-specific environment variables
@@ -27,6 +21,7 @@ def test_test_settings_use_test_env_vars(monkeypatch):
     assert test_settings.embedding_model == "text-embedding-3-large"
 
 
+@pytest.mark.unit
 def test_test_settings_different_from_regular_settings():
     """Test that test settings differ from regular settings when TEST_* vars are set."""
     # Get regular and test settings

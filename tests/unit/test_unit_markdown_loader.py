@@ -21,6 +21,7 @@ def tmp_file(tmp_path: Path) -> Path:
     return p
 
 
+@pytest.mark.unit
 def test_parse_markdown_file(tmp_file: Path):
     """Check that a markdown file is parsed correctly."""
     chunks = parse_markdown_file(tmp_file)

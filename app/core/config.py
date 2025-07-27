@@ -45,8 +45,9 @@ class Settings(BaseSettings):
     embedding_dim: int = 3072
 
     # Test-specific environment variables
-    test_pinecone_index: str | None = None
+    test_pinecone_index: str = "self-memory-test"
     test_embedding_model: str | None = None
+    test_pinecone_namespace: str = "self-memory-test-namespace"
 
     @classmethod
     def for_testing(cls) -> "Settings":
@@ -62,5 +63,7 @@ class Settings(BaseSettings):
             settings.pinecone_index = settings.test_pinecone_index
         if settings.test_embedding_model:
             settings.embedding_model = settings.test_embedding_model
+        if settings.test_pinecone_namespace:
+            settings.pinecone_namespace = settings.test_pinecone_namespace
 
         return settings

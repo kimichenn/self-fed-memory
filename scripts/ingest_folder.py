@@ -21,9 +21,13 @@ from app.ingestion.markdown_loader import parse_markdown_file
     "directory", type=click.Path(exists=True, file_okay=False, path_type=pathlib.Path)
 )
 @click.option("--dry-run", is_flag=True, help="Parse + chunk but skip Pinecone upload.")
-def main(directory: pathlib.Path, dry_run: bool) -> None:
+def main(
+    directory: pathlib.Path, dry_run: bool, memory_manager: MemoryManager | None = None
+) -> None:
     """Index every ``.md`` under *DIRECTORY* (recursive)."""
-    if dry_run:
+    if memory_manager:
+        manager = memory_manager
+    elif dry_run:
         manager = None
     else:
         embeddings = get_embeddings()

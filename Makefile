@@ -12,21 +12,17 @@ install-dev: ## Install development dependencies
 	@echo "Installing development dependencies..."
 	@pip install -e ".[dev,test]"
 
-test: ## Run tests
-	@echo "Running tests..."
-	@PYTHONPATH=. pytest
+test: ## Run all automated (unit and integration) tests
+	@echo "Running automated unit and integration tests..."
+	@PYTHONPATH=. pytest -m "unit or integration"
 
-test-cov: ## Run tests with coverage report
-	@echo "Running tests with coverage..."
-	@PYTHONPATH=. pytest --cov=app --cov-report=term-missing --cov-report=html
+test-cov: ## Run automated tests with coverage report
+	@echo "Running automated tests with coverage..."
+	@PYTHONPATH=. pytest -m "unit or integration" --cov=app --cov-report=term-missing --cov-report=html
 
-test-integration: ## Run integration tests only
-	@echo "Running integration tests..."
-	@PYTHONPATH=. pytest -m integration
-
-test-unit: ## Run unit tests only
-	@echo "Running unit tests..."
-	@PYTHONPATH=. pytest -m "not integration"
+test-manual: ## Run manual verification tests (requires API keys)
+	@echo "Running manual verification tests..."
+	@PYTHONPATH=. pytest -m "manual" -s --tb=short -x
 
 lint: ## Run linting
 	@echo "Running linter..."

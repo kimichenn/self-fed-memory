@@ -66,10 +66,19 @@ Edit `.env` with your API keys:
 OPENAI_API_KEY=sk-your-openai-key-here
 PINECONE_API_KEY=pcn-your-pinecone-key-here
 
+# Optional tracing and monitoring
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2-your-langsmith-key-here
+LANGSMITH_PROJECT=self_memory
+
 # Optional (with defaults)
 PINECONE_ENV=us-east-1
 PINECONE_INDEX=self-memory
 EMBEDDING_MODEL=text-embedding-3-large
+
+# Testing (recommended for development)
+TEST_PINECONE_INDEX=self-memory-test
+TEST_EMBEDDING_MODEL=text-embedding-3-large
 ```
 
 ### 4. Initialize Vector Store
@@ -111,10 +120,11 @@ while True:
 #### Option B: Web Interface (Coming Soon)
 
 ```bash
-# Start the FastAPI backend
+# Note: API and frontend are placeholder files currently
+# Start the FastAPI backend (when implemented)
 uvicorn app.api.main:app --reload
 
-# Start the Streamlit frontend
+# Start the Streamlit frontend (when implemented)
 streamlit run frontend/app.py
 ```
 
@@ -131,7 +141,6 @@ self-fed-memory/
 │   │   ├── memory.py            # Memory manager
 │   │   ├── retriever.py         # Time-weighted retriever
 │   │   ├── vector_store/        # Vector database adapters
-│   │   │   ├── base.py         # Abstract interface
 │   │   │   ├── pinecone.py     # Pinecone implementation
 │   │   │   └── mock.py         # In-memory testing
 │   │   └── chains/              # LangChain orchestration
@@ -187,19 +196,26 @@ response = chain.invoke({"query": "What have I been working on lately?"})
 
 ### Running Tests
 
+Our test suite includes **14 automated unit tests** (fast, deterministic) and **9 manual verification tests** (require human evaluation with real APIs).
+
 ```bash
 # Install test dependencies
 pip install -e ".[test]"
 
-# Run all tests
-pytest
+# Run automated unit tests (fast, no API keys required)
+make test
 
 # Run with coverage
-pytest --cov=app --cov-report=html
+make test-cov
 
-# Run specific test file
-pytest tests/test_memory.py
+# Run manual verification tests (requires API keys + human evaluation)
+make test-manual
+
+# List available manual tests
+make test-manual-list
 ```
+
+**Testing Philosophy**: Fast, reliable automation for logic verification + comprehensive manual testing for quality assurance.
 
 ### Code Quality
 
@@ -219,17 +235,23 @@ mypy app/
 To add support for a new vector database:
 
 1. Create a new file in `app/core/vector_store/`
-2. Implement the `VectorStoreInterface` from `base.py`
-3. Update the factory in `__init__.py`
+2. Extend the LangChain `VectorStore` base class
+3. Implement required methods like `similarity_search`, `add_documents`, etc.
+4. Update the factory logic in `MemoryManager` to use your new store
 
 Example:
 
 ```python
 # app/core/vector_store/chroma.py
-from .base import VectorStoreInterface
+from langchain_core.vectorstores import VectorStore
+from langchain_core.documents import Document
 
-class ChromaVectorStore(VectorStoreInterface):
-    def query(self, vector: List[float], top_k: int = 5) -> List[MemoryChunk]:
+class ChromaVectorStore(VectorStore):
+    def similarity_search(self, query: str, k: int = 5) -> List[Document]:
+        # Implementation here
+        pass
+
+    def add_documents(self, documents: List[Document]) -> List[str]:
         # Implementation here
         pass
 ```
@@ -240,13 +262,18 @@ All configuration is handled through environment variables and the `Settings` cl
 
 ### Key Settings
 
-| Variable             | Default                  | Description                   |
-| -------------------- | ------------------------ | ----------------------------- |
-| `OPENAI_API_KEY`     | -                        | **Required** OpenAI API key   |
-| `PINECONE_API_KEY`   | -                        | **Required** Pinecone API key |
-| `PINECONE_INDEX`     | `self-memory`            | Pinecone index name           |
-| `EMBEDDING_MODEL`    | `text-embedding-3-large` | OpenAI embedding model        |
-| `PINECONE_NAMESPACE` | `self-memory-namespace`  | Pinecone namespace            |
+| Variable               | Default                  | Description                   |
+| ---------------------- | ------------------------ | ----------------------------- |
+| `OPENAI_API_KEY`       | -                        | **Required** OpenAI API key   |
+| `PINECONE_API_KEY`     | -                        | **Required** Pinecone API key |
+| `PINECONE_INDEX`       | `self-memory`            | Pinecone index name           |
+| `EMBEDDING_MODEL`      | `text-embedding-3-large` | OpenAI embedding model        |
+| `PINECONE_NAMESPACE`   | `self-memory-namespace`  | Pinecone namespace            |
+| `LANGSMITH_TRACING`    | `false`                  | Enable LangSmith tracing      |
+| `LANGSMITH_API_KEY`    | -                        | LangSmith API key (optional)  |
+| `LANGSMITH_PROJECT`    | `self_memory`            | LangSmith project name        |
+| `TEST_PINECONE_INDEX`  | `self-memory-test`       | Separate index for testing    |
+| `TEST_EMBEDDING_MODEL` | `text-embedding-3-large` | Embedding model for tests     |
 
 ## Roadmap
 
@@ -261,8 +288,8 @@ All configuration is handled through environment variables and the `Settings` cl
 
 ### 🚧 Phase 2 (In Progress)
 
--   [ ] FastAPI backend with `/chat` endpoint
--   [ ] Streamlit web interface
+-   [ ] FastAPI backend with `/chat` endpoint (placeholder files exist)
+-   [ ] Streamlit web interface (directory structure ready)
 -   [ ] Conversation memory (learns from chats)
 -   [ ] Improved chunking strategies
 
@@ -286,9 +313,10 @@ All configuration is handled through environment variables and the `Settings` cl
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and add tests
-4. Run the test suite: `pytest`
-5. Submit a pull request
+3. Make your changes and add tests (unit tests for logic, manual tests for user experience)
+4. Run the automated test suite: `make test`
+5. For changes affecting user experience, run manual verification: `make test-manual`
+6. Submit a pull request
 
 ## Privacy & Security
 

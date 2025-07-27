@@ -18,6 +18,7 @@ def tmp_file(tmp_path: Path) -> Path:
     return p
 
 
+@pytest.mark.unit
 @patch("app.core.memory.PineconeVectorStore")
 def test_ingestion_pipeline(mock_pinecone_store, tmp_file: Path):
     """Test the full ingestion pipeline with a mock vector store."""
