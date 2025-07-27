@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+.DS_Store
+
+# Project-specific
+# Personal data - never commit actual notes/memories
+personal_notes/
+data/
+memories/
+*.md.backup
+
+# Local development databases
+*.db
+*.sqlite
+local_vector_store/
+
+# Environment files with real keys
+.env.local
+.env.production
+
+# Temporary files from ingestion
+temp_chunks/
+ingestion_logs/
+
+design_doc.md
