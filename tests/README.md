@@ -11,7 +11,8 @@ This directory contains all the tests for the Self-Fed Memory system. The test s
     -   **Vector Store Adapters**: MockVectorStore and PineconeVectorStore functionality, CRUD operations, configuration handling
     -   **Configuration**: Environment variable loading and validation
     -   **Time-Weighted Retriever**: Mathematical scoring functions and document ranking
-    -   **QA Chain**: Question-answering logic and response formatting
+    -   **QA Chains**: Basic and intelligent question-answering logic and response formatting
+    -   **Preference Tracking**: Preference extraction and intelligent retrieval components
 -   **Integration Tests (`test_integration_*.py`):** These tests ensure that multiple components of the application work together correctly. They may use mocks for external services (like OpenAI or Pinecone APIs) but test the real interaction between internal modules.
 -   **Manual Tests (`test_manual_*.py`):** These are end-to-end tests that use **real APIs** and require a human to evaluate the qualitative aspects of the system, such as the relevance and coherence of an AI's response.
 
@@ -29,28 +30,34 @@ tests/
 │   ├── test_mock_vector_store.py       # Unit tests for MockVectorStore functionality
 │   ├── test_pinecone_vector_store.py   # Unit tests for PineconeVectorStore (fully mocked, no real API calls)
 │   ├── test_time_weighted_retriever.py # Unit tests for time-weighted scoring logic
-│   ├── test_qa_chain.py                # Unit tests for the QA chain's internal logic
-│   ├── test_end_to_end_qa.py           # End-to-end QA flow test (uses MockVectorStore)
+│   ├── test_qa_chain.py                # Unit tests for the basic QA chain's internal logic
+│   ├── test_unit_intelligent_qa_chain.py # Unit tests for intelligent QA chain components
 │   ├── test_ingestion.py               # Unit tests for ingestion logic
 │   ├── test_ingest_folder.py           # Unit tests for folder ingestion script
 │   └── test_unit_markdown_loader.py    # Unit tests for Markdown document loading
 ├── integration/
+│   ├── test_end_to_end_qa.py           # End-to-end QA flow test (uses MockVectorStore)
+│   ├── test_integration_intelligent_qa_chain.py # Integration test for intelligent QA chain
 │   └── test_integration_markdown_loader.py # Integration test for Markdown parsing (filesystem I/O)
 └── manual/
-    └── test_manual_qa_chain.py         # Manual verification tests (uses REAL Pinecone & OpenAI APIs)
+    ├── test_manual_qa_chain.py         # Manual verification tests for basic QA (uses REAL APIs)
+    └── test_manual_intelligent_qa.py   # Manual verification tests for intelligent QA (uses REAL APIs)
 ```
 
 ## API Usage Summary
 
 ### Tests Using REAL APIs (Require API Keys)
 
--   **`tests/manual/test_manual_qa_chain.py`** - Uses real PineconeVectorStore instance that makes actual API calls to your Pinecone test index and OpenAI
+-   **`tests/manual/test_manual_qa_chain.py`** - Uses real PineconeVectorStore instance that makes actual API calls to your Pinecone test index and OpenAI for basic QA testing
+-   **`tests/manual/test_manual_intelligent_qa.py`** - Uses real APIs to test the intelligent QA chain with preference extraction and contextual retrieval
 
 ### Tests Using OFFLINE Mocks/Fakes
 
 -   **`tests/unit/test_pinecone_vector_store.py`** - Extensively mocks Pinecone API using `@patch` decorators (no real API calls)
 -   **`tests/unit/test_mock_vector_store.py`** - Tests the MockVectorStore implementation (pure in-memory, no APIs)
--   **All other unit tests** - Use either MockVectorStore or patch PineconeVectorStore (no real API calls)
+-   **`tests/unit/test_unit_intelligent_qa_chain.py`** - Tests intelligent QA chain components with mocked dependencies
+-   **`tests/integration/test_integration_intelligent_qa_chain.py`** - Integration test for intelligent QA with MockVectorStore (no API calls)
+-   **All other unit and integration tests** - Use either MockVectorStore or patch PineconeVectorStore (no real API calls)
 
 ## Running Tests
 
@@ -111,11 +118,18 @@ pytest tests/unit/test_time_weighted_retriever.py
 
 ## Manual Verification Explained
 
-The manual tests in `test_manual_qa_chain.py` are essential for evaluating the aspects of the system that cannot be easily asserted in code. When you run `make test-manual`, the script will:
+The manual tests in `test_manual_qa_chain.py` and `test_manual_intelligent_qa.py` are essential for evaluating the aspects of the system that cannot be easily asserted in code. When you run `make test-manual`, the scripts will:
 
 1.  Connect to your real Pinecone and OpenAI accounts.
 2.  Ingest a small, controlled set of test memories.
-3.  Run a series of queries against the system.
-4.  Print the AI-generated answers, the retrieved context, and guided prompts for your evaluation.
+3.  Run a series of queries against both the basic and intelligent QA systems.
+4.  Print the AI-generated answers, retrieved context, preference application, and guided prompts for your evaluation.
 
-Your role is to manually inspect this output to assess response quality, retrieval relevance, and overall system behavior. The test automatically cleans up the data from your Pinecone index after the run.
+Your role is to manually inspect this output to assess:
+
+-   Response quality and relevance
+-   Preference extraction and application accuracy
+-   Contextual understanding in intelligent QA
+-   Overall system behavior and personality consistency
+
+Both tests automatically clean up the data from your Pinecone index after the run.

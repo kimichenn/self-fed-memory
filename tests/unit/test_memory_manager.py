@@ -48,12 +48,16 @@ class TestMemoryManagerInitialization:
         mock_embeddings = MagicMock()
         manager = MemoryManager(embeddings=mock_embeddings)
         assert manager.use_time_weighting is True
-        mock_retriever_class.assert_called_once_with(
-            vector_store=mock_store_class.return_value,
-            embeddings=mock_embeddings,
-            decay_rate=0.01,
-            k=5,
-        )
+        # The `TimeWeightedRetriever` constructor gained new optional keyword
+        # arguments (``llm`` and ``use_intelligent_queries``).  We only care
+        # that the mandatory arguments are forwarded correctly, so we loosen
+        # the expectation here.
+
+        call_args, call_kwargs = mock_retriever_class.call_args
+        assert call_kwargs["vector_store"] == mock_store_class.return_value
+        assert call_kwargs["embeddings"] == mock_embeddings
+        assert call_kwargs["decay_rate"] == 0.01
+        assert call_kwargs["k"] == 5
 
 
 @pytest.mark.unit

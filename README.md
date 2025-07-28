@@ -9,11 +9,13 @@ This system ingests your personal notes and documents, converts them into semant
 **Key Features:**
 
 -   🧠 **Long-term Memory**: Remembers everything you tell it across sessions
+-   🎯 **Intelligent Retrieval**: Advanced multi-query retrieval that understands context and implied questions
+-   🤖 **Preference Learning**: Automatically extracts and applies your preferences from conversations
 -   📝 **Note Ingestion**: Import Markdown files, journals, and personal documents
 -   🔍 **Semantic Search**: Find relevant memories using meaning, not just keywords
 -   ⏰ **Time-Aware**: Weights recent information higher while preserving old memories
--   🎯 **Personalized Responses**: Tailored advice based on your preferences and history
--   🔄 **Continuous Learning**: Learns new facts from conversations
+-   💬 **Contextual Responses**: Tailored advice based on your preferences, habits, and history
+-   🔄 **Continuous Learning**: Learns new facts and preferences from every conversation
 
 ## Architecture
 
@@ -23,12 +25,12 @@ This system ingests your personal notes and documents, converts them into semant
 🔢 Vector Embeddings (OpenAI)
     ↓ (Store in Vector DB)
 🗄️ Pinecone Vector Store
-    ↓ (Semantic Search + Time Weighting)
-🔍 Retriever (LangChain)
-    ↓ (Retrieval-Augmented Generation)
-🤖 GPT-4.1 + Personal Context
-    ↓
-💬 Personalized Response
+    ↓ (Intelligent Multi-Query Retrieval)
+🔍 Intelligent Retriever + Preference Tracker
+    ↓ (Context-Aware RAG)
+🤖 GPT-4.1 + Personal Context + User Preferences
+    ↓ (Auto-Extract New Preferences)
+💬 Personalized Response + Learning
 ```
 
 ## Quick Start
@@ -107,13 +109,24 @@ python -m app.ingestion.markdown_loader --file /path/to/your/journal.md
 ```bash
 python -c "
 from app.core.chains.qa_chain import get_qa_chain
-from app.core.retriever import get_retriever
-
 chain = get_qa_chain()
 while True:
     q = input('You: ')
     if q.lower() in ['quit', 'exit']: break
     print('AI:', chain.invoke({'query': q})['result'])
+"
+
+# Or use the intelligent QA chain
+python -c "
+from app.core.chains.intelligent_qa_chain import get_intelligent_qa_chain
+from app.core.memory import MemoryManager
+memory = MemoryManager()
+chain = get_intelligent_qa_chain(memory, name='Your Name')
+while True:
+    q = input('You: ')
+    if q.lower() in ['quit', 'exit']: break
+    result = chain.invoke({'question': q})
+    print('AI:', result['answer'])
 "
 ```
 
@@ -139,13 +152,15 @@ self-fed-memory/
 │   │   ├── embeddings.py        # Embedding engine
 │   │   ├── llm.py               # LLM client wrapper
 │   │   ├── memory.py            # Memory manager
+│   │   ├── preference_tracker.py # Preference extraction & intelligent retrieval
 │   │   ├── retriever.py         # Time-weighted retriever
 │   │   ├── vector_store/        # Vector database adapters
 │   │   │   ├── pinecone.py     # Pinecone implementation
 │   │   │   └── mock.py         # In-memory testing
 │   │   └── chains/              # LangChain orchestration
-│   │       ├── qa_chain.py     # Q&A chain
-│   │       └── memory_chain.py # Memory management
+│   │       ├── qa_chain.py           # Basic Q&A chain
+│   │       ├── intelligent_qa_chain.py # Advanced intelligent Q&A
+│   │       └── memory_chain.py       # Memory management
 │   ├── ingestion/               # Data ingestion
 │   │   └── markdown_loader.py  # Markdown file processor
 │   ├── api/                     # Web API (FastAPI)
@@ -161,6 +176,26 @@ self-fed-memory/
 ```
 
 ## Usage Examples
+
+### Intelligent Q&A with Preference Learning
+
+```python
+from app.core.chains.intelligent_qa_chain import get_intelligent_qa_chain
+from app.core.memory import MemoryManager
+
+# Setup with intelligent retrieval enabled
+memory = MemoryManager(use_intelligent_queries=True)
+chain = get_intelligent_qa_chain(memory, name="Alex", auto_extract_preferences=True)
+
+# The system understands context and applies preferences automatically
+response = chain.invoke({
+    "question": "Based on what you know about me, which restaurant would I enjoy more: a fancy French bistro or a simple sushi place?"
+})
+
+print(response["answer"])
+print(f"Applied {response['user_preferences_found']} preferences and {response['user_facts_found']} facts")
+print(f"Learned {response['extraction_results'].get('extracted_count', 0)} new preferences")
+```
 
 ### Basic Q&A
 
@@ -185,6 +220,28 @@ memory.add_memory(
 )
 ```
 
+### Manual Preference Extraction
+
+```python
+from app.core.preference_tracker import PreferenceTracker
+
+tracker = PreferenceTracker(memory_manager)
+
+# Extract preferences from a conversation
+conversation = """
+User: I really enjoyed that small tapas place, but the loud music was annoying.
+I prefer quieter atmospheres where I can actually have a conversation.
+Assistant: That's great feedback! For quieter dining, you might enjoy...
+"""
+
+result = tracker.extract_and_store_preferences(conversation)
+print(f"Extracted {result['preferences']} preferences and {result['facts']} facts")
+
+# Get all stored preferences
+preferences = tracker.get_user_preferences()
+print(f"Total stored preferences: {len(preferences)}")
+```
+
 ### Time-Based Queries
 
 ```python
@@ -195,8 +252,6 @@ response = chain.invoke({"query": "What have I been working on lately?"})
 ## Development
 
 ### Running Tests
-
-Our test suite includes **14 automated unit tests** (fast, deterministic) and **9 manual verification tests** (require human evaluation with real APIs).
 
 ```bash
 # Install test dependencies
@@ -285,12 +340,16 @@ All configuration is handled through environment variables and the `Settings` cl
 -   [x] Time-weighted retrieval
 -   [x] Basic Q&A chain with LangChain
 -   [x] Configuration management
+-   [x] **Intelligent retrieval system with multi-query support**
+-   [x] **Automatic preference extraction and learning**
+-   [x] **Context-aware response generation**
+-   [x] **Conversation memory with preference application**
 
 ### 🚧 Phase 2 (In Progress)
 
 -   [ ] FastAPI backend with `/chat` endpoint (placeholder files exist)
 -   [ ] Streamlit web interface (directory structure ready)
--   [ ] Conversation memory (learns from chats)
+-   [ ] Enhanced preference management and editing
 -   [ ] Improved chunking strategies
 
 ### 🔮 Phase 3 (Planned)

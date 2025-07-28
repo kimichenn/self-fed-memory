@@ -19,6 +19,8 @@ class MemoryManager:
         embeddings: Embeddings,
         use_time_weighting: bool = True,
         decay_rate: float = 0.01,
+        use_intelligent_queries: bool = True,
+        llm=None,
     ):
         """Initialize MemoryManager.
 
@@ -26,6 +28,8 @@ class MemoryManager:
             embeddings: Embeddings model for vector operations
             use_time_weighting: Whether to use time-weighted retrieval (default: True)
             decay_rate: Time decay rate for time-weighted retrieval (default: 0.01)
+            use_intelligent_queries: Whether to use LLM-powered query analysis (default: True)
+            llm: Language model for query analysis (optional)
         """
         self.embeddings = embeddings
         self.store = PineconeVectorStore(embeddings)
@@ -37,6 +41,8 @@ class MemoryManager:
                 embeddings=embeddings,
                 decay_rate=decay_rate,
                 k=5,  # Default k, can be overridden in search
+                llm=llm,
+                use_intelligent_queries=use_intelligent_queries,
             )
         else:
             self.retriever = None
