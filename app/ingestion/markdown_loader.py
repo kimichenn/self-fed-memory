@@ -70,6 +70,9 @@ def parse_markdown_file(path: str | Path) -> list[dict[str, Any]]:
     content = post.content
     fm_created = post.metadata.get("created")
 
+    # Extract all frontmatter metadata except 'created' which is handled separately
+    frontmatter_metadata = {k: v for k, v in post.metadata.items() if k != "created"}
+
     fm_dt = None
     if fm_created:
         if isinstance(fm_created, datetime):
@@ -106,6 +109,7 @@ def parse_markdown_file(path: str | Path) -> list[dict[str, Any]]:
             "content": chunk,
             "created_at": chosen_ts.isoformat(),
             "source": str(path),
+            **frontmatter_metadata,  # Include all frontmatter metadata in each chunk
         }
         for chunk in chunks
     ]
