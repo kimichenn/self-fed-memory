@@ -42,7 +42,7 @@ def test_manual_intelligent_qa():
     Manual test for the IntelligentQAChain using real APIs and actual notes.
     This test requires manual verification of the output.
     """
-    settings = Settings.for_testing()
+    Settings.for_testing()
 
     vector_store = PineconeVectorStore(embeddings=get_embeddings())
 

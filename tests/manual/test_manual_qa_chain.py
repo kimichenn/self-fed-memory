@@ -22,8 +22,6 @@ Prerequisites:
 - It is highly recommended to use a separate test index in Pinecone.
 """
 
-from datetime import datetime
-from datetime import timedelta
 import os
 from pathlib import Path
 import time
@@ -32,12 +30,11 @@ from langchain_openai import ChatOpenAI
 import pytest
 
 from app.core.chains.qa_chain import IntegratedQAChain
+from app.core.config import Settings
 from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
 from app.core.vector_store.pinecone import PineconeVectorStore
 from app.ingestion.markdown_loader import parse_markdown_file
-from tests.helpers import get_test_settings
-from app.core.config import Settings
 
 # Marker for tests that require real API keys. Skips them if keys are not found.
 requires_real_apis = pytest.mark.skipif(

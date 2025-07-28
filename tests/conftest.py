@@ -2,9 +2,9 @@
 Shared pytest fixtures for all tests.
 """
 
+import os
 from pathlib import Path
 
-import os
 from _pytest.monkeypatch import MonkeyPatch
 import pytest
 
