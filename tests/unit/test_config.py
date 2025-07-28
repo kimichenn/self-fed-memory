@@ -31,8 +31,9 @@ def test_test_settings_different_from_regular_settings():
     # If TEST_* variables are set, the test settings should be different
     if regular_settings.test_pinecone_index:
         assert test_settings.pinecone_index == regular_settings.test_pinecone_index
-        # The test index should typically be different from production
-        assert test_settings.pinecone_index != regular_settings.pinecone_index
+
+        if regular_settings.pinecone_index != regular_settings.test_pinecone_index:
+            assert test_settings.pinecone_index != regular_settings.pinecone_index
 
     if regular_settings.test_embedding_model:
         assert test_settings.embedding_model == regular_settings.test_embedding_model

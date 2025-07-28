@@ -73,7 +73,7 @@ class IntelligentQAChain:
             auto_extract_preferences: Whether to automatically extract preferences from conversations
         """
         self.memory_manager = memory_manager
-        self.llm = llm or ChatOpenAI(model="gpt-4o", temperature=0.1)
+        self.llm = llm or ChatOpenAI(model="gpt-4.1-2025-04-14", temperature=0.1)
         self.k = k
         self.name = name
         self.auto_extract_preferences = auto_extract_preferences

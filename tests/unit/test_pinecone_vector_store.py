@@ -157,6 +157,8 @@ class TestPineconeVectorStoreInitialization:
 
         mock_embeddings = MagicMock()
 
+        PineconeVectorStore(embeddings=mock_embeddings, custom_param="value")
+
         # Verify parent class initialized with kwargs
         mock_super_init.assert_called_once_with(
             index_name="test-index",

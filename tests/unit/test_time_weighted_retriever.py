@@ -196,3 +196,120 @@ class TestTimeWeightedRetrieverMath:
         assert 0.9 < score1 <= 1.0
         assert 0.9 < score2 <= 1.0
         assert 0.9 < score3 <= 1.0
+
+
+@pytest.mark.unit
+class TestTimeWeightedRetrieverBehaviour:
+    """Behaviour-oriented tests for TimeWeightedRetriever."""
+
+    @pytest.fixture()
+    def mock_vector_store(self) -> MagicMock:  # type: ignore[return-value]
+        """A mock vector store with similarity_search & upsert capabilities."""
+        store = MagicMock()
+        # ``upsert`` is explicitly defined so we can assert calls.
+        store.upsert = MagicMock()
+        return store
+
+    @pytest.fixture()
+    def retriever(self, mock_vector_store: MagicMock) -> TimeWeightedRetriever:
+        """A retriever instance wired to the mock vector store."""
+        return TimeWeightedRetriever(
+            vector_store=mock_vector_store,
+            embeddings=MagicMock(),  # Embeddings are not used in these tests
+            decay_rate=0.01,
+            k=3,
+            use_intelligent_queries=False,  # Ensure _basic_retrieval code path
+        )
+
+    def _build_docs(self, now: datetime):  # noqa: D401 – helper
+        """Helper that returns three documents with varying recency.
+
+        The documents are purposely returned in *reverse* chronological order
+        so that correct re-ranking (recency + similarity) can be asserted.
+        """
+
+        doc_newest = Document(
+            page_content="I am the newest document",
+            metadata={"id": "newest", "created_at": now.isoformat()},
+        )
+        doc_old = Document(
+            page_content="I am the oldest document",
+            metadata={
+                "id": "old",
+                "created_at": (now - timedelta(hours=10)).isoformat(),
+            },
+        )
+        doc_mid = Document(
+            page_content="I am the middle document",
+            metadata={
+                "id": "mid",
+                "created_at": (now - timedelta(hours=2)).isoformat(),
+            },
+        )
+        # Intentionally return in a non-ideal order to test re-ranking.
+        return [doc_old, doc_mid, doc_newest]
+
+    def test_basic_retrieval_reranks_and_updates_timestamps(
+        self, retriever: TimeWeightedRetriever, mock_vector_store: MagicMock
+    ) -> None:
+        """The newest document should be ranked first after re-scoring.
+
+        We also verify that ``last_accessed_at`` is added to metadata and that
+        the vector store's ``upsert`` method is invoked once.
+        """
+        now = datetime.utcnow()
+
+        # Arrange: similarity_search returns documents in sub-optimal order.
+        docs_from_store = self._build_docs(now)
+        mock_vector_store.similarity_search.return_value = docs_from_store
+
+        # Act
+        results = retriever.get_relevant_documents("arbitrary query")
+
+        # Assert – re-ranking by combined (similarity + recency) places the
+        # most recent document first.
+        assert results[0].metadata["id"] == "newest"
+        assert {d.metadata["id"] for d in results} == {"newest", "mid", "old"}
+
+        # All returned docs should have a ``last_accessed_at`` timestamp.
+        for doc in results:
+            assert "last_accessed_at" in doc.metadata
+
+        # The retriever should persist timestamp updates via ``upsert``.
+        mock_vector_store.upsert.assert_called_once()
+        updated_docs = mock_vector_store.upsert.call_args.args[0]
+        # Every upserted document must carry the new timestamp as well.
+        assert all("last_accessed_at" in d.metadata for d in updated_docs)
+
+    def test_search_wrapper_returns_dicts(
+        self, retriever: TimeWeightedRetriever, mock_vector_store: MagicMock
+    ) -> None:
+        """The ``search`` helper should return a list of dictionaries."""
+        now = datetime.utcnow()
+        mock_vector_store.similarity_search.return_value = self._build_docs(now)
+
+        results = retriever.search("does not matter")
+
+        assert isinstance(results, list)
+        assert results, "search() must return at least one result"
+        assert isinstance(results[0], dict)
+        # The dict should include both metadata and the content field.
+        assert "content" in results[0]
+        assert "id" in results[0]
+
+    def test_update_access_timestamps_direct_call(
+        self, retriever: TimeWeightedRetriever, mock_vector_store: MagicMock
+    ) -> None:
+        """Direct exercise of the _update_access_timestamps helper.
+
+        Ensures that the helper enriches metadata and delegates to the vector
+        store exactly once.
+        """
+        now = datetime.utcnow()
+        doc = Document(page_content="data", metadata={"id": "42"})
+
+        retriever._update_access_timestamps([doc], accessed_at=now)
+
+        mock_vector_store.upsert.assert_called_once()
+        upserted_docs = mock_vector_store.upsert.call_args.args[0]
+        assert upserted_docs[0].metadata["last_accessed_at"] == now.isoformat()

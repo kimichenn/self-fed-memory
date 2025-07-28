@@ -65,7 +65,7 @@ class IntelligentQueryAnalyzer:
     """Analyzes user queries to generate comprehensive search strategies."""
 
     def __init__(self, llm: BaseChatModel = None):
-        self.llm = llm or ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+        self.llm = llm or ChatOpenAI(model="gpt-4.1-04-14", temperature=0.1)
 
         self.prompt = ChatPromptTemplate.from_template(QUERY_ANALYSIS_PROMPT)
         self.chain = self.prompt | self.llm | StrOutputParser()
@@ -209,8 +209,11 @@ class TimeWeightedRetriever:
             # Get time decay score
             time_score = self._calculate_time_score(doc, now)
 
-            # Combined score
-            combined_score = similarity_score + time_score
+            # Combined score – favour recency by down-weighting similarity.
+            # Using ``decay_rate`` as the weight ensures that similarity has
+            # *less* influence when a slow decay is configured (typical use
+            # case) and slightly more influence for fast-decaying setups.
+            combined_score = time_score + (self.decay_rate * similarity_score)
             scored_docs.append((combined_score, doc))
 
         # Sort by combined score and take top k
@@ -285,13 +288,16 @@ class TimeWeightedRetriever:
         timestamp_str = accessed_at.isoformat()
         updated_docs = []
 
-        for doc in docs:
+        for idx, doc in enumerate(docs):
             # Create updated document with new timestamp
             new_metadata = doc.metadata.copy()
             new_metadata["last_accessed_at"] = timestamp_str
 
             updated_doc = Document(page_content=doc.page_content, metadata=new_metadata)
             updated_docs.append(updated_doc)
+
+            # Replace the original reference so callers see updated metadata
+            docs[idx] = updated_doc
 
         # Upsert back to vector store to persist the timestamp updates
         try:

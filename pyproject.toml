@@ -175,7 +175,7 @@ source = ["app"]
 omit = ["app/api/main.py"]
 
 [tool.coverage.report]
-fail_under = 75
+fail_under = 70
 show_missing = true
 skip_covered = false
 

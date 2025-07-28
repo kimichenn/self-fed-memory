@@ -4,8 +4,11 @@ Shared pytest fixtures for all tests.
 
 from pathlib import Path
 
+import os
 from _pytest.monkeypatch import MonkeyPatch
 import pytest
+
+from app.core.config import Settings
 
 # ---------------------------------------------------------------------------
 # Automatic test markers based on path
@@ -54,4 +57,41 @@ def monkeypatch_module():
     try:
         yield mpatch
     finally:
+        mpatch.undo()
+
+
+# ---------------------------------------------------------------------------
+# Global environment setup for Pinecone tests
+# ---------------------------------------------------------------------------
+# Some tests instantiate the production `PineconeVectorStore` (either directly
+# or indirectly via `MemoryManager`).  To guarantee these tests **always** use
+# a dedicated *test* index – and never accidentally read from / write to a
+# production collection – we force the `PINECONE_INDEX` environment variable to
+# the value provided by our testing settings.  Because we register the fixture
+# with ``autouse=True`` it applies automatically to *every* test module.
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ensure_test_pinecone_index():
+    """Ensure all tests use the *test* Pinecone index.
+
+    We first look for an explicit ``TEST_PINECONE_INDEX`` environment variable
+    (which individual tests *may* set for customisation).  If absent, we fall
+    back to the default provided by ``Settings.for_testing()``.  The chosen
+    value is then injected into ``PINECONE_INDEX`` so that any subsequent
+    instantiation of ``Settings()`` - for example in the production
+    ``PineconeVectorStore`` - resolves to the correct index.
+    """
+
+    test_index = os.getenv("TEST_PINECONE_INDEX", Settings.for_testing().pinecone_index)
+
+    # Apply environment patch at session scope using our own MonkeyPatch instance
+    mpatch = MonkeyPatch()
+    mpatch.setenv("PINECONE_INDEX", test_index)
+
+    # Yield control to the test session
+    try:
+        yield
+    finally:
+        # Roll back after all tests complete
         mpatch.undo()

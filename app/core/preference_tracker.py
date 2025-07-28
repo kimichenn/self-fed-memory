@@ -61,7 +61,7 @@ class PreferenceTracker:
 
     def __init__(self, memory_manager: MemoryManager, llm: BaseChatModel = None):
         self.memory_manager = memory_manager
-        self.llm = llm or ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+        self.llm = llm or ChatOpenAI(model="gpt-4.1-2025-04-14", temperature=0.1)
 
         self.extraction_prompt = ChatPromptTemplate.from_template(
             PREFERENCE_EXTRACTION_PROMPT
