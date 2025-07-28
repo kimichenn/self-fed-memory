@@ -8,10 +8,10 @@ Purpose:
 - To run fast, deterministic tests without any external API calls.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
-from langchain_core.documents import Document
 
 from app.core.chains.qa_chain import IntegratedQAChain
 

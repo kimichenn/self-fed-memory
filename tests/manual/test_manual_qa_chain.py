@@ -21,12 +21,13 @@ Prerequisites:
 - It is highly recommended to use a separate test index in Pinecone.
 """
 
+from datetime import datetime
+from datetime import timedelta
 import os
 import time
-from datetime import datetime, timedelta
 
-import pytest
 from langchain_openai import ChatOpenAI
+import pytest
 
 from app.core.chains.qa_chain import IntegratedQAChain
 from app.core.embeddings import get_embeddings
@@ -105,7 +106,7 @@ def real_qa_setup(monkeypatch_module):
     print(f"Ingested {len(test_memories)} test memories...")
 
     # 5. Wait for Pinecone to index the vectors
-    for attempt in range(15):
+    for _ in range(15):
         stats = vector_store.index.describe_index_stats()
         count = (
             stats.get("namespaces", {})
@@ -178,7 +179,7 @@ def test_time_weighted_retrieval(real_qa_setup: IntegratedQAChain):
     result = real_qa_setup.invoke({"question": query})
 
     print(f"\nAnswer: {result['answer']}")
-    print(f"\nRetrieved memories (should be ranked by relevance + recency):")
+    print("\nRetrieved memories (should be ranked by relevance + recency):")
     for doc in result["source_documents"]:
         print(
             f"  - [{doc['id']}] Created: {doc['created_at']}, "

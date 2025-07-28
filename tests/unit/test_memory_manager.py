@@ -10,15 +10,14 @@ This module tests the core functionality of the MemoryManager facade including:
 
 from __future__ import annotations
 
-import time
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock
+from unittest.mock import call
+from unittest.mock import patch
 
-import pytest
 from langchain_core.documents import Document
+import pytest
 
 from app.core.memory import MemoryManager
-from app.core.types import to_document
 
 
 @pytest.mark.unit

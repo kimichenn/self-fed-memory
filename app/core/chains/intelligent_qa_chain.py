@@ -10,23 +10,22 @@ This chain integrates multiple advanced features:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI
 
 from app.core.memory import MemoryManager
-from app.core.preference_tracker import PreferenceTracker, IntelligentRetriever
-
+from app.core.preference_tracker import IntelligentRetriever
+from app.core.preference_tracker import PreferenceTracker
 
 INTELLIGENT_QA_TEMPLATE = """You are an intelligent personal AI assistant for {name}.
 
 You have access to comprehensive information about the user, including:
 - Their personal notes, documents, and memories
-- Their preferences, habits, and decision patterns  
+- Their preferences, habits, and decision patterns
 - Their communication style and learning preferences
 - Important facts and context about their life
 
@@ -90,9 +89,9 @@ class IntelligentQAChain:
         self.qa_chain = self.prompt | self.llm | StrOutputParser()
 
         # Store conversation history for context
-        self.conversation_history: List[Dict[str, str]] = []
+        self.conversation_history: list[dict[str, str]] = []
 
-    def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def invoke(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Process a question with full contextual intelligence."""
         question = inputs.get("question", "")
         conversation_context = inputs.get("conversation_history", "")
@@ -168,7 +167,7 @@ class IntelligentQAChain:
             "retrieval_strategy": "intelligent_multi_query",
         }
 
-    def _format_main_context(self, docs: List[Dict[str, Any]]) -> str:
+    def _format_main_context(self, docs: list[dict[str, Any]]) -> str:
         """Format main retrieved documents into readable context."""
         if not docs:
             return "No directly relevant information found."
@@ -199,7 +198,7 @@ class IntelligentQAChain:
             else "No content documents found."
         )
 
-    def _format_user_context(self, context_docs: List[Dict[str, Any]]) -> str:
+    def _format_user_context(self, context_docs: list[dict[str, Any]]) -> str:
         """Format user preferences and facts into readable context."""
         if not context_docs:
             return "No specific user preferences or context found for this topic."
@@ -249,7 +248,7 @@ class IntelligentQAChain:
 
         return "\n".join(formatted)
 
-    def get_user_preferences_summary(self) -> Dict[str, Any]:
+    def get_user_preferences_summary(self) -> dict[str, Any]:
         """Get a summary of all stored user preferences."""
         all_preferences = self.preference_tracker.get_user_preferences()
 
@@ -274,7 +273,7 @@ class IntelligentQAChain:
         """Clear the conversation history (for new sessions)."""
         self.conversation_history = []
 
-    def simulate_preference_extraction(self, conversation: str) -> Dict[str, Any]:
+    def simulate_preference_extraction(self, conversation: str) -> dict[str, Any]:
         """Manually extract preferences from a conversation (for testing/manual use)."""
         return self.preference_tracker.extract_and_store_preferences(conversation)
 

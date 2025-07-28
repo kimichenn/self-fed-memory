@@ -10,10 +10,11 @@ This module tests the Pinecone vector store adapter including:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-import pytest
 from langchain_core.documents import Document
+import pytest
 
 from app.core.vector_store.pinecone import PineconeVectorStore
 
@@ -114,8 +115,7 @@ class TestPineconeVectorStoreInitialization:
 
         mock_embeddings = MagicMock()
 
-        # Initialize store
-        store = PineconeVectorStore(embeddings=mock_embeddings)
+        PineconeVectorStore(embeddings=mock_embeddings)
 
         # Verify index creation called
         mock_pc.create_index.assert_called_once_with(
@@ -157,9 +157,6 @@ class TestPineconeVectorStoreInitialization:
 
         mock_embeddings = MagicMock()
 
-        # Initialize store with kwargs
-        store = PineconeVectorStore(embeddings=mock_embeddings, custom_param="value")
-
         # Verify parent class initialized with kwargs
         mock_super_init.assert_called_once_with(
             index_name="test-index",
@@ -180,7 +177,6 @@ class TestPineconeVectorStoreAdapterMethods:
             patch("app.core.vector_store.pinecone.Settings") as mock_settings_class,
             patch("app.core.vector_store.pinecone.LangchainPinecone.__init__"),
         ):
-
             mock_settings = MagicMock()
             mock_settings.pinecone_namespace = "test-namespace"
             mock_settings_class.return_value = mock_settings
@@ -273,7 +269,6 @@ class TestPineconeVectorStoreProperties:
             patch("app.core.vector_store.pinecone.Settings") as mock_settings_class,
             patch("app.core.vector_store.pinecone.LangchainPinecone.__init__"),
         ):
-
             mock_settings = MagicMock()
             mock_settings.pinecone_namespace = "test-namespace"
             mock_settings_class.return_value = mock_settings
@@ -329,7 +324,6 @@ class TestPineconeVectorStoreNamespaceHandling:
             patch("app.core.vector_store.pinecone.Settings") as mock_settings_class,
             patch("app.core.vector_store.pinecone.LangchainPinecone.__init__"),
         ):
-
             mock_settings = MagicMock()
             mock_settings.pinecone_namespace = "custom-namespace"
             mock_settings_class.return_value = mock_settings

@@ -2,11 +2,10 @@
 Shared pytest fixtures for all tests.
 """
 
-import pytest
-from _pytest.monkeypatch import MonkeyPatch
-import contextlib
 from pathlib import Path
 
+from _pytest.monkeypatch import MonkeyPatch
+import pytest
 
 # ---------------------------------------------------------------------------
 # Automatic test markers based on path

@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.core.vector_store.mock import MockVectorStore
 from app.core.memory import MemoryManager
+from app.core.vector_store.mock import MockVectorStore
 
 
 @pytest.fixture

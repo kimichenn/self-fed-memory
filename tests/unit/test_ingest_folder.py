@@ -18,11 +18,7 @@ def test_ingest_folder_script(tmp_path: Path):
     temp_dir.mkdir()
     p = temp_dir / "test.md"
     p.write_text(
-        "---\n"
-        "created: Jun 11, 2024 at 9:40 AM\n"
-        "---\n"
-        "# Title\n\n"
-        "This is a test."
+        "---\ncreated: Jun 11, 2024 at 9:40 AM\n---\n# Title\n\nThis is a test."
     )
 
     # 2. Run the script callback directly (bypass Click's CLI parsing entirely)

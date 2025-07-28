@@ -1,9 +1,12 @@
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import MagicMock, patch
+
 from app.core.chains.intelligent_qa_chain import IntelligentQAChain
+from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
 from app.core.vector_store.mock import MockVectorStore
-from app.core.embeddings import get_embeddings
 
 
 @pytest.fixture

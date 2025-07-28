@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-import pytest
 from langchain_core.documents import Document
+import pytest
 
 from app.core.chains.qa_chain import IntegratedQAChain
 from app.core.memory import MemoryManager

@@ -6,17 +6,16 @@ from conversations to enable more intelligent retrieval and responses.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
-from typing import Any, Dict, List
+import json
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from app.core.memory import MemoryManager
-
 
 PREFERENCE_EXTRACTION_PROMPT = """You are an intelligent preference extraction system for a personal AI assistant.
 
@@ -45,7 +44,7 @@ Extract any preferences, patterns, or important context. Format as JSON:
   ],
   "facts": [
     {
-      "category": "personal/work/hobby/etc", 
+      "category": "personal/work/hobby/etc",
       "fact": "important factual information",
       "confidence": 0.9
     }
@@ -69,7 +68,7 @@ class PreferenceTracker:
         )
         self.extraction_chain = self.extraction_prompt | self.llm | StrOutputParser()
 
-    def extract_and_store_preferences(self, conversation: str) -> Dict[str, Any]:
+    def extract_and_store_preferences(self, conversation: str) -> dict[str, Any]:
         """Extract preferences from a conversation and store them."""
         try:
             # Extract preferences using LLM
@@ -127,12 +126,10 @@ class PreferenceTracker:
             # If extraction fails, return empty result
             return {"extracted_count": 0, "preferences": 0, "facts": 0, "error": str(e)}
 
-    def get_user_preferences(self, category: str = None) -> List[Dict[str, Any]]:
+    def get_user_preferences(self, category: str = None) -> list[dict[str, Any]]:
         """Retrieve stored user preferences, optionally filtered by category."""
-        if category:
-            query = f"user preferences {category}"
-        else:
-            query = "user preferences"
+
+        query = f"user preferences {category}" if category else "user preferences"
 
         # Search for preference documents
         results = self.memory_manager.search(query, k=20, use_time_weighting=False)
@@ -142,7 +139,7 @@ class PreferenceTracker:
 
         return preferences
 
-    def get_user_context(self, topic: str) -> List[Dict[str, Any]]:
+    def get_user_context(self, topic: str) -> list[dict[str, Any]]:
         """Get relevant user context for a specific topic."""
         # Search for both preferences and facts related to the topic
         query = f"user context preferences facts {topic}"
@@ -162,7 +159,7 @@ class PreferenceTracker:
 
         return context
 
-    def update_preference(self, preference_id: str, updates: Dict[str, Any]) -> bool:
+    def update_preference(self, preference_id: str, updates: dict[str, Any]) -> bool:
         """Update an existing preference (for manual corrections)."""
         # This would require implementing update functionality in the vector store
         # For now, we'll add a new version and mark the old one as superseded
@@ -204,7 +201,7 @@ class IntelligentRetriever:
             memory_manager
         )
 
-    def retrieve_with_context(self, query: str, k: int = 5) -> Dict[str, Any]:
+    def retrieve_with_context(self, query: str, k: int = 5) -> dict[str, Any]:
         """Retrieve documents with automatic preference and context enhancement."""
 
         # Get main search results

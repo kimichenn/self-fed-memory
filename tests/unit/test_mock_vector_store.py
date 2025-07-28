@@ -10,11 +10,10 @@ This module tests the mock vector store implementation including:
 
 from __future__ import annotations
 
-import random
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from langchain_core.documents import Document
+import pytest
 
 from app.core.vector_store.mock import MockVectorStore
 

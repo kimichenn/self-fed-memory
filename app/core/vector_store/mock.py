@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, List
 import random
-from datetime import datetime
+from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -19,11 +18,11 @@ class MockVectorStore(VectorStore):
     @classmethod
     def from_texts(
         cls,
-        texts: List[str],
+        texts: list[str],
         embedding: Embeddings,
-        metadatas: List[dict] | None = None,
+        metadatas: list[dict] | None = None,
         **kwargs: Any,
-    ) -> "MockVectorStore":
+    ) -> MockVectorStore:
         """Create a MockVectorStore from a list of texts."""
         instance = cls(embedding, **kwargs)
 

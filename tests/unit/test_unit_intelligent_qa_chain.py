@@ -1,8 +1,12 @@
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import MagicMock, patch
+
 from app.core.chains.intelligent_qa_chain import IntelligentQAChain
 from app.core.memory import MemoryManager
-from app.core.preference_tracker import PreferenceTracker, IntelligentRetriever
+from app.core.preference_tracker import IntelligentRetriever
+from app.core.preference_tracker import PreferenceTracker
 
 
 @pytest.fixture

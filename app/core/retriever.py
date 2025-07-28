@@ -13,27 +13,24 @@ Key features:
 
 from __future__ import annotations
 
-import math
 from datetime import datetime
+import math
 from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_core.vectorstores import VectorStore
 from langchain_core.language_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.vectorstores import VectorStore
 from langchain_openai import ChatOpenAI
 
-from app.core.types import to_document
-
-
-QUERY_ANALYSIS_PROMPT = """You are an intelligent query analyzer for a personal memory system. 
+QUERY_ANALYSIS_PROMPT = """You are an intelligent query analyzer for a personal memory system.
 Your job is to understand what information the user really needs and generate effective search queries.
 
 The user has a personal knowledge base containing:
 - Notes, documents, conversations
-- Preferences, opinions, past decisions  
+- Preferences, opinions, past decisions
 - Learning materials, projects, ideas
 - Personal context and background info
 - Future goals
@@ -47,7 +44,7 @@ Analyze this query and generate 3-5 search queries that would help retrieve ALL 
 4. Implied information needs
 
 Examples:
-- User: "Which restaurant should I choose?" 
+- User: "Which restaurant should I choose?"
   Searches: ["restaurant preferences", "food allergies dietary restrictions", "recent restaurant experiences", "favorite cuisines types", "budget dining preferences"]
 
 - User: "Help me solve this calculus problem"
@@ -90,7 +87,7 @@ class IntelligentQueryAnalyzer:
                 # Fallback to original query if parsing fails
                 return [user_query]
 
-        except Exception as e:
+        except Exception:
             # Fallback to original query if analysis fails
             return [user_query]
 
@@ -275,7 +272,7 @@ class TimeWeightedRetriever:
 
             return time_score
 
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # If timestamp parsing fails, give neutral score
             return 0.0
 
@@ -309,7 +306,7 @@ class TimeWeightedRetriever:
                 ]
                 if ids:
                     self.vector_store.add_documents(updated_docs, ids=ids)
-        except Exception as e:
+        except Exception:
             # If timestamp update fails, log but don't break retrieval
             # In production, you might want to use proper logging here
             pass

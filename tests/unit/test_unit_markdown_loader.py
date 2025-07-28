@@ -12,11 +12,7 @@ def tmp_file(tmp_path: Path) -> Path:
     """Create a temporary markdown file for testing."""
     p = tmp_path / "test.md"
     p.write_text(
-        "---\n"
-        "created: Jun 11, 2024 at 9:40 AM\n"
-        "---\n"
-        "# Title\n\n"
-        "This is a test."
+        "---\ncreated: Jun 11, 2024 at 9:40 AM\n---\n# Title\n\nThis is a test."
     )
     return p
 

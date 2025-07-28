@@ -1,10 +1,12 @@
-import pytest
 import os
+
+import pytest
+
 from app.core.chains.intelligent_qa_chain import IntelligentQAChain
-from app.core.memory import MemoryManager
-from app.core.vector_store.pinecone import PineconeVectorStore
 from app.core.config import Settings
 from app.core.embeddings import get_embeddings
+from app.core.memory import MemoryManager
+from app.core.vector_store.pinecone import PineconeVectorStore
 
 
 @pytest.mark.manual
