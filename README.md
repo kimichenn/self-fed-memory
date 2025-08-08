@@ -130,15 +130,14 @@ while True:
 "
 ```
 
-#### Option B: Web Interface (Coming Soon)
+#### Option B: Web Interface
 
 ```bash
-# Note: API and frontend are placeholder files currently
-# Start the FastAPI backend (when implemented)
-uvicorn app.api.main:app --reload
+# Start the FastAPI backend
+make api-dev
 
-# Start the Streamlit frontend (when implemented)
-streamlit run frontend/app.py
+# Start the Streamlit frontend
+make ui-dev
 ```
 
 ## Project Structure
@@ -347,8 +346,8 @@ All configuration is handled through environment variables and the `Settings` cl
 
 ### 🚧 Phase 2 (In Progress)
 
--   [ ] FastAPI backend with `/chat` endpoint (placeholder files exist)
--   [ ] Streamlit web interface (directory structure ready)
+-   [x] FastAPI backend with `/chat`, OpenAI-compatible endpoints, and memory upsert
+-   [x] Streamlit web interface (chat UI)
 -   [ ] Enhanced preference management and editing
 -   [ ] Improved chunking strategies
 

@@ -50,6 +50,7 @@ tests/
 
 -   **`tests/manual/test_manual_qa_chain.py`** - Uses real PineconeVectorStore instance that makes actual API calls to your Pinecone test index and OpenAI for basic QA testing
 -   **`tests/manual/test_manual_intelligent_qa.py`** - Uses real APIs to test the intelligent QA chain with preference extraction and contextual retrieval
+-   **`tests/manual/test_manual_api_chat.py`** - Calls the running FastAPI server (`make api-dev`) and exercises `/memories/upsert` and `/chat` end-to-end. Prints responses for manual review
 
 ### Tests Using OFFLINE Mocks/Fakes
 
@@ -99,7 +100,19 @@ make test
 ```bash
 # Run all manual tests
 make test-manual
+
+# Or run only the API manual test (ensure API is running in another terminal)
+pytest tests/manual/test_manual_api_chat.py -s -m manual
 ```
+
+### Running the API locally for manual tests
+
+```bash
+conda activate self-mem
+make api-dev
+```
+
+Then, in a separate terminal, run the manual tests as shown above.
 
 #### Running Specific Tests with Pytest
 

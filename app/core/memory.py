@@ -9,6 +9,7 @@ from langchain_core.embeddings import Embeddings
 from app.core.retriever import TimeWeightedRetriever
 from app.core.types import to_document
 from app.core.vector_store.pinecone import PineconeVectorStore
+from app.core.config import Settings
 
 
 class MemoryManager:
@@ -21,6 +22,7 @@ class MemoryManager:
         decay_rate: float = 0.01,
         use_intelligent_queries: bool = True,
         llm=None,
+        cfg: Settings | None = None,
     ):
         """Initialize MemoryManager.
 
@@ -32,7 +34,7 @@ class MemoryManager:
             llm: Language model for query analysis (optional)
         """
         self.embeddings = embeddings
-        self.store = PineconeVectorStore(embeddings)
+        self.store = PineconeVectorStore(embeddings, cfg=cfg)
         self.use_time_weighting = use_time_weighting
 
         if use_time_weighting:

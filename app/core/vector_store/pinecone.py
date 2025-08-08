@@ -18,8 +18,8 @@ from app.core.config import Settings
 class PineconeVectorStore(LangchainPinecone, VectorStore):
     """Thin adapter for the official Langchain Pinecone integration."""
 
-    def __init__(self, embeddings: Embeddings, **kwargs):
-        self.cfg = Settings()
+    def __init__(self, embeddings: Embeddings, cfg: Settings | None = None, **kwargs):
+        self.cfg = cfg or Settings()
         pc = Pinecone(
             api_key=self.cfg.pinecone_api_key,
             environment=self.cfg.pinecone_env,
