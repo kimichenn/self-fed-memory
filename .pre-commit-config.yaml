@@ -38,18 +38,10 @@ repos:
             pass_filenames: false
             stages: [pre-commit]
 
-          # Quick safety net on commit: fast unit tests only
-          - id: pytest-unit
-            name: pytest (unit)
-            entry: bash -lc 'eval "$(conda shell.bash hook)" && conda activate self-mem && PYTHONPATH=. pytest -q -m "unit" --maxfail=1'
+          # Run full automated test suite (unit + integration) on commit to match CI
+          - id: pytest-all
+            name: pytest (unit + integration)
+            entry: bash -lc 'eval "$(conda shell.bash hook)" && conda activate self-mem && PYTHONPATH=. pytest -q -m "unit or integration" --maxfail=1'
             language: system
             pass_filenames: false
             stages: [pre-commit]
-
-          # Heavier suite before you push: lint + mypy + unit+integration tests
-          - id: make-check
-            name: full check (lint, type-check, tests)
-            entry: bash -lc 'eval "$(conda shell.bash hook)" && conda activate self-mem && make check'
-            language: system
-            pass_filenames: false
-            stages: [pre-push]

@@ -20,6 +20,8 @@ class PineconeVectorStore(LangchainPinecone, VectorStore):
 
     def __init__(self, embeddings: Embeddings, cfg: Settings | None = None, **kwargs):
         self.cfg = cfg or Settings()
+        # Attempt to create client; if API key missing during tests, raise a
+        # clear error that tests can patch around
         pc = Pinecone(
             api_key=self.cfg.pinecone_api_key,
             environment=self.cfg.pinecone_env,

@@ -91,25 +91,21 @@ EMBEDDING_MODEL=text-embedding-3-large
 # Testing (recommended for development)
 TEST_PINECONE_INDEX=self-memory-test
 TEST_EMBEDDING_MODEL=text-embedding-3-large
+
+# Optional: Supabase (for chat history, users, permanent memories)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-service-role-or-anon-key
 ```
 
-### 4. Initialize Vector Store
+### 4. Initialize Vector Store (automatic)
 
-Set up your Pinecone index:
-
-```bash
-# This will create the index if it doesn't exist
-python -c "from app.core.vector_store.pinecone import PineconeVectorStore; PineconeVectorStore().initialize_index()"
-```
+No manual step is required. The Pinecone index and namespace are created on first use if missing. Proceed directly to ingestion.
 
 ### 5. Ingest Your Personal Data
 
 ```bash
 # Ingest a folder of Markdown files
 python scripts/ingest_folder.py /path/to/your/notes
-
-# Or ingest individual files
-python -m app.ingestion.markdown_loader --file /path/to/your/journal.md
 ```
 
 ### 6. Start the System
@@ -118,25 +114,30 @@ python -m app.ingestion.markdown_loader --file /path/to/your/journal.md
 
 ```bash
 python -c "
-from app.core.chains.qa_chain import get_qa_chain
-chain = get_qa_chain()
+from app.core.embeddings import get_embeddings
+from app.core.memory import MemoryManager
+from app.core.chains.qa_chain import IntegratedQAChain
+mem = MemoryManager(get_embeddings())
+chain = IntegratedQAChain(mem, k=5, name='Your Name')
 while True:
     q = input('You: ')
     if q.lower() in ['quit', 'exit']: break
-    print('AI:', chain.invoke({'query': q})['result'])
+    res = chain.invoke({'question': q})
+    print('AI:', res['answer'])
 "
 
 # Or use the intelligent QA chain
 python -c "
-from app.core.chains.intelligent_qa_chain import get_intelligent_qa_chain
+from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
-memory = MemoryManager()
-chain = get_intelligent_qa_chain(memory, name='Your Name')
+from app.core.chains.intelligent_qa_chain import IntelligentQAChain
+mem = MemoryManager(get_embeddings())
+chain = IntelligentQAChain(mem, name='Your Name', k=8)
 while True:
     q = input('You: ')
     if q.lower() in ['quit', 'exit']: break
-    result = chain.invoke({'question': q})
-    print('AI:', result['answer'])
+    res = chain.invoke({'question': q, 'conversation_history': ''})
+    print('AI:', res['answer'])
 "
 ```
 
@@ -150,38 +151,88 @@ make run
 docker compose up --build
 ```
 
+Once the UI is running (Streamlit at http://localhost:8501), you can:
+
+-   Open the Settings (⚙) to configure Intelligent mode, API base URL, and persistence. "Store chat history (Supabase)" is enabled by default; the backend will simply ignore it if Supabase is not configured.
+-   Use the Memory Manager (🧠) → "Upload Markdown Files" to ingest `.md` files. The loader honors front‑matter and filename dates and chunks documents for retrieval. Uploaded items are indexed for vector search (Pinecone) and, for core types (preference/fact/profile), also persisted to Supabase when configured.
+
+### 7. Supabase Persistence (Optional)
+
+If you want to persist chat history and permanent memories, set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env`. A suggested schema is provided in `app/core/knowledge_store.py` docstring. When enabled:
+
+-   Single-user by default: chats are stored under a single default session. You don’t need to manage session IDs.
+-   You can override the default with `SUPABASE_DEFAULT_SESSION_ID` if desired.
+-   `/chat` accepts `store_chat` and will persist messages automatically. It also returns the session id used (for debugging/ops), but the UI no longer requires it.
+-   `POST /permanent_memories/upsert` stores permanent memories (single-user)
+-   `GET /chat/history?session_id=...` reads a session's message history; the UI auto-loads this history on start when a `sid` is present in the URL or a `Session ID` is set in Settings.
+-   Test vs Production tables: set `TEST_SUPABASE_TABLE_PREFIX` (defaults to `test_`). Toggle per-request with `use_test_supabase` (see below). The UI now provides a single **Developer mode** toggle that switches both Pinecone and Supabase to test resources for the current conversation.
+
+Vector retrieval remains in Pinecone; store any retrievable content via `/memories/upsert` as before.
+
+#### Memory Router
+
+-   The system uses a rules-based router to send core items (types: `preference`, `fact`, `profile`, `user_core`) to Supabase permanent memories, and all items to Pinecone for semantic retrieval (unless `route_to_vector=false`).
+-   From conversations, the Preference Extractor labels items with `type`, and the router persists them accordingly when `store_chat=true`.
+-   API supports:
+    -   `POST /memories/upsert` with fields `type`, `category`, `route_to_vector`.
+    -   `POST /memories/delete` with `target=pinecone|supabase|both`.
+    -   `GET /memories/search` merging Pinecone + Supabase (substring) results.
+
+#### Test/Prod toggles
+
+-   Pinecone: `use_test_index` (and `TEST_PINECONE_INDEX` env) switch to test index/namespace.
+-   Supabase: `use_test_supabase` switches to test table prefix (`TEST_SUPABASE_TABLE_PREFIX`, default `test_`).
+    -   Frontend now uses a single **Developer mode** toggle that sets both flags for all requests issued by that conversation. The sidebar shows "🧪 DEV" next to chats in developer mode, and the chat header shows a "Mode: 🧪 DEV MODE" badge.
+    -   Note: the default session id is the same across prefixes unless you override with `SUPABASE_DEFAULT_SESSION_ID`.
+
+#### Security
+
+-   Use the Supabase SERVICE-ROLE key only on the server (never expose to the browser). Keep it in environment secrets.
+-   If you must use the anon/publishable key in the browser, enforce Row Level Security (RLS) policies that strictly scope access by user/session and restrict all writes.
+-   Protect write/read endpoints with an API key: set `API_AUTH_KEY` in backend env and include header `x-api-key: <API_AUTH_KEY>` when calling:
+    -   `POST /chat` (only enforced when `store_chat=true`)
+    -   `POST /permanent_memories/upsert`
+    -   `GET /chat/history`
+-   Always use HTTPS and rotate keys regularly.
+
 ## Project Structure
 
 ```
 self-fed-memory/
 ├── app/                          # Main Python package
+│   ├── api/
+│   │   ├── main.py               # FastAPI app factory and CORS
+│   │   └── routes_chat.py        # /chat, /memories/*, OpenAI-compatible endpoints
 │   ├── core/                     # Core business logic
-│   │   ├── config.py            # Environment configuration
-│   │   ├── types.py             # Pydantic models & types
-│   │   ├── embeddings.py        # Embedding engine
-│   │   ├── llm.py               # LLM client wrapper
-│   │   ├── memory.py            # Memory manager
-│   │   ├── preference_tracker.py # Preference extraction & intelligent retrieval
-│   │   ├── retriever.py         # Time-weighted retriever
-│   │   ├── vector_store/        # Vector database adapters
-│   │   │   ├── pinecone.py     # Pinecone implementation
-│   │   │   └── mock.py         # In-memory testing
-│   │   └── chains/              # LangChain orchestration
-│   │       ├── qa_chain.py           # Basic Q&A chain
-│   │       ├── intelligent_qa_chain.py # Advanced intelligent Q&A
-│   │       └── memory_chain.py       # Memory management
-│   ├── ingestion/               # Data ingestion
-│   │   └── markdown_loader.py  # Markdown file processor
-│   ├── api/                     # Web API (FastAPI)
-│   │   ├── main.py             # FastAPI app
-│   │   └── routes_chat.py      # Chat endpoints
-│   └── utils/                   # Utilities
-│       └── text_splitter.py    # Text chunking
-├── scripts/                     # CLI tools
-│   └── ingest_folder.py        # Bulk ingestion
-├── tests/                       # Test suite
-├── frontend/                    # Web UI (future)
-└── docs/                        # Documentation
+│   │   ├── chains/
+│   │   │   ├── intelligent_qa_chain.py # Preference-aware, contextual QA
+│   │   │   ├── memory_chain.py         # (present, reserved)
+│   │   │   └── qa_chain.py             # Basic integrated QA
+│   │   ├── embeddings.py         # Embedding engine (OpenAI with offline fallback)
+│   │   ├── knowledge_store.py    # Supabase-backed persistence (sessions, memories)
+│   │   ├── memory.py             # MemoryManager (Pinecone/Mock + retriever)
+│   │   ├── memory_router.py      # Routes items to Pinecone and Supabase
+│   │   ├── preference_tracker.py # Extracts and queries user preferences/facts
+│   │   ├── retriever.py          # Time-weighted + intelligent multi-query retrieval
+│   │   ├── types.py              # Helpers (dict → Document)
+│   │   └── vector_store/
+│   │       ├── mock.py           # In-memory VectorStore for tests/offline
+│   │       └── pinecone.py       # Pinecone VectorStore adapter
+│   ├── ingestion/
+│   │   └── markdown_loader.py    # Markdown parsing + timestamping + chunking
+│   └── utils/
+│       └── text_splitter.py      # Shared chunking strategy
+├── frontend/
+│   └── app.py                    # Streamlit UI (chat + memory manager + settings)
+├── scripts/
+│   └── ingest_folder.py          # CLI: bulk-ingest a directory of .md files
+├── tests/                        # Unit, integration, and manual tests
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+├── README.md
+├── tests/README.md
+└── design_doc.md
 ```
 
 ## Usage Examples
@@ -189,51 +240,61 @@ self-fed-memory/
 ### Intelligent Q&A with Preference Learning
 
 ```python
-from app.core.chains.intelligent_qa_chain import get_intelligent_qa_chain
+from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
+from app.core.chains.intelligent_qa_chain import IntelligentQAChain
 
-# Setup with intelligent retrieval enabled
-memory = MemoryManager(use_intelligent_queries=True)
-chain = get_intelligent_qa_chain(memory, name="Alex", auto_extract_preferences=True)
+memory = MemoryManager(get_embeddings(), use_time_weighting=True)
+chain = IntelligentQAChain(memory, name="Alex", k=8)
 
-# The system understands context and applies preferences automatically
-response = chain.invoke({
+result = chain.invoke({
     "question": "Based on what you know about me, which restaurant would I enjoy more: a fancy French bistro or a simple sushi place?"
 })
 
-print(response["answer"])
-print(f"Applied {response['user_preferences_found']} preferences and {response['user_facts_found']} facts")
-print(f"Learned {response['extraction_results'].get('extracted_count', 0)} new preferences")
+print(result["answer"])
+print(f"Applied {result['user_preferences_found']} preferences and {result['user_facts_found']} facts")
 ```
 
 ### Basic Q&A
 
 ```python
-from app.core.chains.qa_chain import get_qa_chain
+from app.core.embeddings import get_embeddings
+from app.core.memory import MemoryManager
+from app.core.chains.qa_chain import IntegratedQAChain
 
-chain = get_qa_chain()
-response = chain.invoke({"query": "What are my core values?"})
-print(response["result"])
+mm = MemoryManager(get_embeddings())
+chain = IntegratedQAChain(mm, k=5, name="User")
+response = chain.invoke({"question": "What are my core values?"})
+print(response["answer"])
 ```
 
 ### Adding New Memories
 
 ```python
+from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
 
-memory = MemoryManager()
-memory.add_memory(
-    content="I started learning Spanish today using Duolingo.",
-    source="conversation",
-    timestamp="2024-01-15"
-)
+memory = MemoryManager(get_embeddings())
+memory.add_chunks([
+    {
+        "id": "mem_2024_01_15_spanish",
+        "content": "I started learning Spanish today using Duolingo.",
+        "source": "conversation",
+        "created_at": "2024-01-15T12:00:00",
+        "type": "fact",
+        "category": "learning"
+    }
+])
 ```
 
 ### Manual Preference Extraction
 
 ```python
+from app.core.embeddings import get_embeddings
+from app.core.memory import MemoryManager
 from app.core.preference_tracker import PreferenceTracker
 
+memory_manager = MemoryManager(get_embeddings())
 tracker = PreferenceTracker(memory_manager)
 
 # Extract preferences from a conversation
@@ -285,7 +346,7 @@ make test-manual-list
 
 ### Git hooks (pre-commit)
 
-We use `pre-commit` to automatically run fast checks locally.
+We use `pre-commit` to automatically run checks locally.
 
 Setup (once):
 
@@ -300,16 +361,17 @@ pre-commit run --all-files
 
 What runs when:
 
--   Commit:
+-   **Commit**:
     -   ruff auto-fix and format
     -   mypy (uses config in `pyproject.toml`)
-    -   unit tests: `pytest -q -m "unit" --maxfail=1`
--   Push:
-    -   full check via `make check` (ruff lint, mypy type-check, unit + integration tests)
+    -   unit + integration tests: `pytest -q -m "unit or integration" --maxfail=1` (with coverage; same thresholds as CI)
+-   **Push**:
+    -   no additional local checks (to avoid duplication); CI repeats the same suite
 
 Notes:
 
 -   Manual tests are not run by hooks (they require real API keys and human review).
+-   The commit hook selects tests by marker; any "deselected" count you see in output just reflects excluded markers (e.g., `manual`).
 -   Use any environment you prefer (venv, Conda, Docker). Hooks run in your active shell environment.
 
 ```bash
@@ -355,18 +417,19 @@ All configuration is handled through environment variables and the `Settings` cl
 
 ### Key Settings
 
-| Variable               | Default                  | Description                   |
-| ---------------------- | ------------------------ | ----------------------------- |
-| `OPENAI_API_KEY`       | -                        | **Required** OpenAI API key   |
-| `PINECONE_API_KEY`     | -                        | **Required** Pinecone API key |
-| `PINECONE_INDEX`       | `self-memory`            | Pinecone index name           |
-| `EMBEDDING_MODEL`      | `text-embedding-3-large` | OpenAI embedding model        |
-| `PINECONE_NAMESPACE`   | `self-memory-namespace`  | Pinecone namespace            |
-| `LANGSMITH_TRACING`    | `false`                  | Enable LangSmith tracing      |
-| `LANGSMITH_API_KEY`    | -                        | LangSmith API key (optional)  |
-| `LANGSMITH_PROJECT`    | `self_memory`            | LangSmith project name        |
-| `TEST_PINECONE_INDEX`  | `self-memory-test`       | Separate index for testing    |
-| `TEST_EMBEDDING_MODEL` | `text-embedding-3-large` | Embedding model for tests     |
+| Variable               | Default                  | Description                               |
+| ---------------------- | ------------------------ | ----------------------------------------- |
+| `OPENAI_API_KEY`       | -                        | **Required** OpenAI API key               |
+| `PINECONE_API_KEY`     | -                        | **Required** Pinecone API key             |
+| `PINECONE_INDEX`       | `self-memory`            | Pinecone index name                       |
+| `PINECONE_NAMESPACE`   | `self-memory-namespace`  | Pinecone namespace                        |
+| `EMBEDDING_MODEL`      | `text-embedding-3-large` | OpenAI embedding model                    |
+| `LANGSMITH_TRACING`    | `false`                  | Enable LangSmith tracing                  |
+| `LANGSMITH_API_KEY`    | -                        | LangSmith API key (optional)              |
+| `LANGSMITH_PROJECT`    | `self_memory`            | LangSmith project name                    |
+| `TEST_PINECONE_INDEX`  | `self-memory-test`       | Separate index for testing                |
+| `TEST_EMBEDDING_MODEL` | `text-embedding-3-large` | Embedding model for tests                 |
+| `API_AUTH_KEY`         | -                        | Optional API auth for protected endpoints |
 
 ## Roadmap
 

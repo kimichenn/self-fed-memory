@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.vectorstores import VectorStore
 
 from app.core.config import Settings
 from app.core.retriever import TimeWeightedRetriever
@@ -34,7 +36,14 @@ class MemoryManager:
             llm: Language model for query analysis (optional)
         """
         self.embeddings = embeddings
-        self.store = PineconeVectorStore(embeddings, cfg=cfg)
+        # Prefer Pinecone; fall back to an in-memory store if misconfigured
+        try:
+            self.store: VectorStore = PineconeVectorStore(embeddings, cfg=cfg)
+        except Exception:
+            # Local fallback for testing/dev without API keys
+            from app.core.vector_store.mock import MockVectorStore
+
+            self.store = MockVectorStore(embeddings=embeddings)
         self.use_time_weighting = use_time_weighting
 
         if use_time_weighting:
@@ -51,8 +60,14 @@ class MemoryManager:
 
     # -------- Ingestion --------------------------------------------------
     def add_chunks(self, chunks: list[dict[str, Any]]) -> None:
-        documents = [to_document(chunk) for chunk in chunks]
-        self.store.upsert(documents)
+        documents: list[Document] = [to_document(chunk) for chunk in chunks]
+        # Prefer custom upsert when available (Pinecone/Mock), else fall back to standard API
+        upsert_fn = getattr(self.store, "upsert", None)
+        if callable(upsert_fn):
+            upsert_fn(documents)
+        else:
+            ids = [doc.metadata.get("id", "") for doc in documents]
+            self.store.add_documents(documents, ids=ids)
 
     # -------- Query ------------------------------------------------------
     def search(

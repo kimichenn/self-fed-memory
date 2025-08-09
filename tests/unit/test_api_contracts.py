@@ -15,5 +15,12 @@ def test_chat_request_model_shape():
     # Required field
     assert "question" in ChatRequest.model_fields
     # Optional fields exist
-    for f in ["name", "k", "intelligent", "conversation_history"]:
+    for f in [
+        "name",
+        "k",
+        "intelligent",
+        "conversation_history",
+        "store_chat",
+        "session_id",
+    ]:
         assert f in ChatRequest.model_fields

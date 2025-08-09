@@ -21,36 +21,43 @@ This directory contains all the tests for the Self-Fed Memory system. The test s
 ```
 tests/
 ├── README.md                           # This file
-├── conftest.py                         # Shared test fixtures and configuration
+├── conftest.py                         # Shared test fixtures, markers assignment, env guards
 ├── helpers.py                          # Helper utilities for tests
 ├── unit/
 │   ├── conftest.py                     # Unit test specific fixtures
-│   ├── test_config.py                  # Unit tests for configuration loading
-│   ├── test_memory_manager.py          # Unit tests for MemoryManager (uses mocked PineconeVectorStore)
-│   ├── test_mock_vector_store.py       # Unit tests for MockVectorStore functionality
-│   ├── test_pinecone_vector_store.py   # Unit tests for PineconeVectorStore (fully mocked, no real API calls)
-│   ├── test_time_weighted_retriever.py # Unit tests for time-weighted scoring logic
-│   ├── test_qa_chain.py                # Unit tests for the basic QA chain's internal logic
-│   ├── test_unit_intelligent_qa_chain.py # Unit tests for intelligent QA chain components
-│   ├── test_ingestion.py               # Unit tests for ingestion logic
-│   ├── test_ingest_folder.py           # Unit tests for folder ingestion script
-│   └── test_unit_markdown_loader.py    # Unit tests for Markdown document loading
+│   ├── test_api_contracts.py           # Validates API request/response schemas
+│   ├── test_config.py                  # Settings & env resolution
+│   ├── test_ingest_folder.py           # CLI ingestion script
+│   ├── test_ingestion.py               # Markdown loader logic
+│   ├── test_memory_manager.py          # MemoryManager behavior
+│   ├── test_memory_router.py           # Routing to Pinecone/Supabase
+│   ├── test_mock_vector_store.py       # Mock vector store functionality
+│   ├── test_mock_vector_store_failures.py # Failure paths in mock store
+│   ├── test_pinecone_vector_store.py   # Pinecone adapter (mocked)
+│   ├── test_qa_chain.py                # Basic QA chain
+│   ├── test_single_session_default.py  # Default single-session behavior
+│   ├── test_supabase_knowledge_store.py# Supabase persistence wrapper (mocked)
+│   ├── test_time_weighted_retriever.py # Time-weighted scoring & ranking
+│   ├── test_unit_intelligent_qa_chain.py # Intelligent QA chain components
+│   └── test_unit_markdown_loader.py    # Markdown loader specifics
 ├── integration/
-│   ├── test_end_to_end_qa.py           # End-to-end QA flow test (uses MockVectorStore)
-│   ├── test_integration_intelligent_qa_chain.py # Integration test for intelligent QA chain
-│   └── test_integration_markdown_loader.py # Integration test for Markdown parsing (filesystem I/O)
+│   ├── test_api_chat.py                # API end-to-end with mocks
+│   ├── test_end_to_end_qa.py           # End-to-end QA flow (MockVectorStore)
+│   ├── test_integration_intelligent_qa_chain.py # Intelligent QA integration
+│   └── test_integration_markdown_loader.py      # Markdown parsing integration
 └── manual/
-    ├── test_manual_qa_chain.py         # Manual verification tests for basic QA (uses REAL APIs)
-    └── test_manual_intelligent_qa.py   # Manual verification tests for intelligent QA (uses REAL APIs)
+    ├── test_manual_api_chat.py         # Live API manual verification
+    ├── test_manual_qa_chain.py         # Basic QA with real APIs
+    └── test_manual_intelligent_qa.py   # Intelligent QA with real APIs
 ```
 
 ## API Usage Summary
 
 ### Tests Using REAL APIs (Require API Keys)
 
--   **`tests/manual/test_manual_qa_chain.py`** - Uses real PineconeVectorStore instance that makes actual API calls to your Pinecone test index and OpenAI for basic QA testing
--   **`tests/manual/test_manual_intelligent_qa.py`** - Uses real APIs to test the intelligent QA chain with preference extraction and contextual retrieval
--   **`tests/manual/test_manual_api_chat.py`** - Calls the running FastAPI server (`make api-dev`) and exercises `/memories/upsert` and `/chat` end-to-end. Prints responses for manual review
+-   `tests/manual/test_manual_api_chat.py` - Calls the running FastAPI server (`make api-dev`) and exercises `/memories/upsert`, `/memories/delete`, `/memories/search`, `/chat`, and `/chat/history` end-to-end. Prints responses for manual review
+-   `tests/manual/test_manual_qa_chain.py` - Uses real Pinecone + OpenAI for basic QA
+-   `tests/manual/test_manual_intelligent_qa.py` - Uses real APIs for intelligent QA with preference extraction
 
 ### Tests Using OFFLINE Mocks/Fakes
 
@@ -108,7 +115,6 @@ pytest tests/manual/test_manual_api_chat.py -s -m manual
 ### Running the API locally for manual tests
 
 ```bash
-# Using venv or conda (activate your environment first)
 make api-dev
 
 # Or via Docker (terminal 1)

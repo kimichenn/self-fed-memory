@@ -8,14 +8,18 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableSerializable
 from langchain_openai import ChatOpenAI
 
 from app.core.memory import MemoryManager
+
+if TYPE_CHECKING:
+    from app.core.memory_router import MemoryRouter
 
 PREFERENCE_EXTRACTION_PROMPT = """You are an intelligent preference extraction system for a personal AI assistant.
 
@@ -61,16 +65,36 @@ class PreferenceTracker:
 
     def __init__(self, memory_manager: MemoryManager, llm: BaseChatModel = None):
         self.memory_manager = memory_manager
-        self.llm = llm or ChatOpenAI(model="gpt-4.1-2025-04-14", temperature=0.1)
+        # Lazy/defensive LLM init to allow offline tests
+        self.llm: BaseChatModel | None = llm
+        if self.llm is None:
+            try:
+                self.llm = ChatOpenAI(model="gpt-4.1-2025-04-14", temperature=0.1)
+            except Exception:
+                self.llm = None
 
         self.extraction_prompt = ChatPromptTemplate.from_template(
             PREFERENCE_EXTRACTION_PROMPT
         )
-        self.extraction_chain = self.extraction_prompt | self.llm | StrOutputParser()
+        self.extraction_chain: RunnableSerializable[dict[str, Any], str] | None
+        if self.llm is not None:
+            self.extraction_chain = (
+                self.extraction_prompt | self.llm | StrOutputParser()
+            )
+        else:
+            self.extraction_chain = None
 
-    def extract_and_store_preferences(self, conversation: str) -> dict[str, Any]:
+    def extract_and_store_preferences(
+        self,
+        conversation: str,
+        router: MemoryRouter | None = None,
+    ) -> dict[str, Any]:
         """Extract preferences from a conversation and store them."""
         try:
+            if self.extraction_chain is None:
+                # Offline fallback: no extraction possible
+                return {"extracted_count": 0, "preferences": 0, "facts": 0}
+
             # Extract preferences using LLM
             response = self.extraction_chain.invoke({"conversation": conversation})
 
@@ -111,9 +135,12 @@ class PreferenceTracker:
                 }
                 stored_items.append(doc_data)
 
-            # Store in memory system
+            # Store via router (Supabase + Pinecone) when available
             if stored_items:
-                self.memory_manager.add_chunks(stored_items)
+                if router is not None:
+                    router.upsert_items(stored_items)
+                else:
+                    self.memory_manager.add_chunks(stored_items)
 
             return {
                 "extracted_count": len(stored_items),

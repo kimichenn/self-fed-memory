@@ -65,14 +65,25 @@ class IntelligentQueryAnalyzer:
     """Analyzes user queries to generate comprehensive search strategies."""
 
     def __init__(self, llm: BaseChatModel = None):
-        self.llm = llm or ChatOpenAI(model="gpt-4.1-04-14", temperature=0.1)
-
+        # Lazy-initialize LLM to avoid requiring OPENAI_API_KEY during tests
+        self.llm: BaseChatModel | None = llm
         self.prompt = ChatPromptTemplate.from_template(QUERY_ANALYSIS_PROMPT)
-        self.chain = self.prompt | self.llm | StrOutputParser()
+        self.chain: Any | None = None
 
     def analyze_query(self, user_query: str) -> list[str]:
         """Analyze user query and generate multiple search queries."""
         try:
+            # Initialize LLM and chain on first use
+            if self.llm is None:
+                try:
+                    self.llm = ChatOpenAI(model="gpt-4.1-04-14", temperature=0.1)
+                except Exception:
+                    # If LLM can't be created (e.g., no API key), fall back
+                    return [user_query]
+
+            if self.chain is None:
+                self.chain = self.prompt | self.llm | StrOutputParser()
+
             response = self.chain.invoke({"user_query": user_query})
 
             # Parse JSON response

@@ -7,6 +7,10 @@ Environment variables expected (see `.env.example`):
 * ``PINECONE_ENV``     - default: ``"us-east-1"``
 * ``PINECONE_INDEX``   - default: ``"self-memory"``
 * ``EMBEDDING_MODEL``  - default: ``"text-embedding-3-large"``
+* ``SUPABASE_URL``     - optional; enables Supabase persistence when set
+* ``SUPABASE_KEY``     - optional; required if ``SUPABASE_URL`` is set
+* ``SUPABASE_DEFAULT_SESSION_ID`` - optional; when set, all chat persists to this
+  single session (single-user design). If not set, a stable default is used.
 
 Test environment variables:
 * ``TEST_PINECONE_INDEX``   - default: uses PINECONE_INDEX value
@@ -44,10 +48,20 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-large"
     embedding_dim: int = 3072
 
+    # Supabase (optional)
+    supabase_url: str | None = None
+    supabase_key: str | None = None
+    supabase_table_prefix: str | None = None
+    supabase_default_session_id: str | None = None
+
+    # Optional API auth for backend endpoints (x-api-key header)
+    api_auth_key: str | None = None
+
     # Test-specific environment variables
     test_pinecone_index: str = "self-memory-test"
     test_embedding_model: str | None = None
     test_pinecone_namespace: str = "self-memory-test-namespace"
+    test_supabase_table_prefix: str | None = "test_"
 
     @classmethod
     def for_testing(cls) -> "Settings":
