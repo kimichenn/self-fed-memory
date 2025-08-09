@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
+
 import requests
 import streamlit as st
-
 
 API_BASE = os.environ.get("SELF_MEMORY_API", "http://localhost:8000")
 
@@ -69,11 +69,10 @@ if prompt:
         for m in st.session_state.history[-6:]
     )
 
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                answer = call_chat_api(prompt, conversation_text)
-            except Exception as e:
-                answer = f"Error: {e}"
-            st.markdown(answer)
+    with st.chat_message("assistant"), st.spinner("Thinking..."):
+        try:
+            answer = call_chat_api(prompt, conversation_text)
+        except Exception as e:
+            answer = f"Error: {e}"
+        st.markdown(answer)
     st.session_state.history.append({"role": "assistant", "content": answer})

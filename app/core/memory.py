@@ -6,10 +6,10 @@ from typing import Any
 
 from langchain_core.embeddings import Embeddings
 
+from app.core.config import Settings
 from app.core.retriever import TimeWeightedRetriever
 from app.core.types import to_document
 from app.core.vector_store.pinecone import PineconeVectorStore
-from app.core.config import Settings
 
 
 class MemoryManager:
@@ -38,7 +38,7 @@ class MemoryManager:
         self.use_time_weighting = use_time_weighting
 
         if use_time_weighting:
-            self.retriever = TimeWeightedRetriever(
+            self.retriever: TimeWeightedRetriever | None = TimeWeightedRetriever(
                 vector_store=self.store,
                 embeddings=embeddings,
                 decay_rate=decay_rate,

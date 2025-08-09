@@ -1,8 +1,7 @@
-import pytest
 from fastapi.testclient import TestClient
+import pytest
 
 from app.api.main import create_app
-
 
 pytestmark = pytest.mark.integration
 

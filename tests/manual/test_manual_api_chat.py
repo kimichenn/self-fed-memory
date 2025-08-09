@@ -4,7 +4,6 @@ import time
 import pytest
 import requests
 
-
 pytestmark = pytest.mark.manual
 
 

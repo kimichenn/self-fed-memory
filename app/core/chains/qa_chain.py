@@ -6,6 +6,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
+from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 
 from app.core.memory import MemoryManager
@@ -92,9 +93,11 @@ def get_integrated_qa_chain(
             {"name": name, "context": context, "question": question}
         )
 
-        return response
+        # Ensure we return a string as declared
+        return str(response)
 
-    return retrieve_and_answer
+    # Wrap the callable as a Runnable for proper typing
+    return RunnableLambda(retrieve_and_answer)
 
 
 class IntegratedQAChain:

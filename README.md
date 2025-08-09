@@ -48,8 +48,18 @@ This system ingests your personal notes and documents, converts them into semant
 git clone https://github.com/yourusername/self-fed-memory.git
 cd self-fed-memory
 
-# Install dependencies
-pip install -e .
+# Option A: Local venv (recommended for most users)
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[ui]"
+
+# Option B: Conda (optional, if you prefer)
+conda create -n self-mem python=3.11 -y
+conda activate self-mem
+pip install -e ".[ui]"
+
+# Option C: Docker (no local Python needed)
+docker build -t self-fed-memory:latest .
 
 ```
 
@@ -133,11 +143,11 @@ while True:
 #### Option B: Web Interface
 
 ```bash
-# Start the FastAPI backend
-make api-dev
+# One command (starts API and UI; requires venv/conda activated)
+make run
 
-# Start the Streamlit frontend
-make ui-dev
+# Or run via Docker Compose (no local Python needed)
+docker compose up --build
 ```
 
 ## Project Structure
@@ -272,6 +282,35 @@ make test-manual-list
 **Testing Philosophy**: Fast, reliable automation for logic verification + comprehensive manual testing for quality assurance.
 
 ### Code Quality
+
+### Git hooks (pre-commit)
+
+We use `pre-commit` to automatically run fast checks locally.
+
+Setup (once):
+
+```bash
+# If you used `make dev`, hooks are already installed.
+# Otherwise, install dev/test deps and hooks:
+pip install -e ".[dev,test]"
+pre-commit install
+# Optional: run on all files once
+pre-commit run --all-files
+```
+
+What runs when:
+
+-   Commit:
+    -   ruff auto-fix and format
+    -   mypy (uses config in `pyproject.toml`)
+    -   unit tests: `pytest -q -m "unit" --maxfail=1`
+-   Push:
+    -   full check via `make check` (ruff lint, mypy type-check, unit + integration tests)
+
+Notes:
+
+-   Manual tests are not run by hooks (they require real API keys and human review).
+-   Use any environment you prefer (venv, Conda, Docker). Hooks run in your active shell environment.
 
 ```bash
 # Format code

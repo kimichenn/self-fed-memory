@@ -108,8 +108,11 @@ pytest tests/manual/test_manual_api_chat.py -s -m manual
 ### Running the API locally for manual tests
 
 ```bash
-conda activate self-mem
+# Using venv or conda (activate your environment first)
 make api-dev
+
+# Or via Docker (terminal 1)
+docker compose up --build api
 ```
 
 Then, in a separate terminal, run the manual tests as shown above.

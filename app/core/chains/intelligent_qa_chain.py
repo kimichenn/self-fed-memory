@@ -253,7 +253,7 @@ class IntelligentQAChain:
         all_preferences = self.preference_tracker.get_user_preferences()
 
         # Group by category
-        by_category = {}
+        by_category: dict[str, list[dict[str, Any]]] = {}
         for pref in all_preferences:
             category = pref.get("category", "general")
             if category not in by_category:

@@ -108,7 +108,7 @@ def real_qa_setup(monkeypatch_module):
             else chunk["content"]
         )
         source_name = Path(chunk.get("source", "unknown")).name
-        print(f"  {i+1}. [{source_name}] {content_preview}")
+        print(f"  {i + 1}. [{source_name}] {content_preview}")
 
     # 1. Configure test settings
     test_settings = Settings.for_testing()

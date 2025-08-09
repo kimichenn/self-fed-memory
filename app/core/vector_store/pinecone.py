@@ -68,7 +68,7 @@ class PineconeVectorStore(LangchainPinecone, VectorStore):
     # ------------------------------------------------------------------
 
     @property
-    def index(self):  # type: ignore[override]
+    def index(self):
         """Return the underlying pinecone `Index` object.
 
         The upstream `LangchainPinecone` implementation stores the raw

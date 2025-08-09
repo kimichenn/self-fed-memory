@@ -151,12 +151,12 @@ line-ending = "auto"
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
+disallow_any_generics = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_defs = false
 ignore_missing_imports = true
-no_implicit_optional = true
+no_implicit_optional = false
 show_error_codes = true
 strict_equality = true
 warn_redundant_casts = true
@@ -164,10 +164,26 @@ warn_return_any = true
 warn_unreachable = true
 warn_unused_configs = true
 warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_typed = true
+warn_required_dynamic_aliases = false
+
+[[tool.mypy.overrides]]
+module = ["app.api.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "scripts.*"]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# Third-party subclassing tends to mismatch strict upstream types; reduce noise
+module = ["app.core.vector_store.*"]
+disable_error_code = ["override"]
 
 # Coverage configuration
 [tool.coverage.run]

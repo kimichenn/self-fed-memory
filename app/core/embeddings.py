@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from langchain_openai import OpenAIEmbeddings
+from pydantic import SecretStr
 
 from app.core.config import Settings
 
@@ -22,6 +23,6 @@ def get_embeddings() -> OpenAIEmbeddings:
     cfg = Settings()
     return OpenAIEmbeddings(
         model=cfg.embedding_model,
-        openai_api_key=cfg.openai_api_key,
+        openai_api_key=SecretStr(cfg.openai_api_key),
         chunk_size=1000,  # Match OpenAI API limit
     )

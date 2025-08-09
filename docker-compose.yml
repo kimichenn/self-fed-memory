@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+    api:
+        build: .
+        image: self-fed-memory:latest
+        container_name: sfm-api
+        environment:
+            - OPENAI_API_KEY=${OPENAI_API_KEY}
+            - PINECONE_API_KEY=${PINECONE_API_KEY}
+            - LANGSMITH_TRACING=${LANGSMITH_TRACING:-false}
+            - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+            - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-self_memory}
+            - PINECONE_INDEX=${PINECONE_INDEX:-self-memory}
+            - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-large}
+            - PINECONE_ENV=${PINECONE_ENV:-us-east-1}
+            - TEST_PINECONE_INDEX=${TEST_PINECONE_INDEX:-self-memory-test}
+            - TEST_EMBEDDING_MODEL=${TEST_EMBEDDING_MODEL:-text-embedding-3-large}
+        ports:
+            - "8000:8000"
+        command: bash -lc "uvicorn app.api.main:app --host 0.0.0.0 --port 8000"
+
+    ui:
+        image: self-fed-memory:latest
+        container_name: sfm-ui
+        depends_on:
+            - api
+        environment:
+            - SELF_MEMORY_API=http://api:8000
+        ports:
+            - "8501:8501"
+        command: bash -lc "SELF_MEMORY_API=http://api:8000 streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0"

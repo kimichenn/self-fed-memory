@@ -1,6 +1,5 @@
-import pytest
 from pydantic import BaseModel
-
+import pytest
 
 pytestmark = pytest.mark.unit
 

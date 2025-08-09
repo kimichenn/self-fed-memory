@@ -120,6 +120,8 @@ class TimeWeightedRetriever:
         self.k = k
         self.use_intelligent_queries = use_intelligent_queries
 
+        # Query analyzer is optional based on configuration
+        self.query_analyzer: IntelligentQueryAnalyzer | None
         if use_intelligent_queries:
             self.query_analyzer = IntelligentQueryAnalyzer(llm)
         else:
@@ -138,11 +140,17 @@ class TimeWeightedRetriever:
 
     def _intelligent_retrieval(self, user_query: str, **kwargs: Any) -> list[Document]:
         """Advanced retrieval using LLM-generated queries for comprehensive coverage."""
+        # Ensure analyzer is available (mypy: narrow Optional)
+        if self.query_analyzer is None:
+            return self._basic_retrieval(user_query, **kwargs)
+
         # Generate multiple search queries
         search_queries = self.query_analyzer.analyze_query(user_query)
 
         # Collect candidates from all queries
-        all_candidates = {}  # doc_id -> (doc, max_score)
+        all_candidates: dict[
+            str, tuple[Document, float]
+        ] = {}  # doc_id -> (doc, max_score)
         now = datetime.utcnow()
 
         for i, query in enumerate(search_queries):

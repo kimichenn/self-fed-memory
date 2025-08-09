@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import HTTPException
+from pydantic import BaseModel
+from pydantic import Field
 
 from app.core.chains.intelligent_qa_chain import IntelligentQAChain
 from app.core.chains.qa_chain import IntegratedQAChain
+from app.core.config import Settings
 from app.core.embeddings import get_embeddings
 from app.core.memory import MemoryManager
-from app.core.config import Settings
-
 
 router = APIRouter()
 
@@ -66,6 +68,7 @@ def chat(
     memory = get_memory_manager(cfg)
 
     if req.intelligent:
+        chain: IntelligentQAChain | IntegratedQAChain
         chain = IntelligentQAChain(memory, k=req.k, name=req.name)
         result = chain.invoke(
             {

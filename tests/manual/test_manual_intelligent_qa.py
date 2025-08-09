@@ -74,7 +74,7 @@ def test_manual_intelligent_qa():
             if len(chunk["content"]) > 100
             else chunk["content"]
         )
-        print(f"  {i+1}. [{chunk.get('source', 'unknown')}] {content_preview}")
+        print(f"  {i + 1}. [{chunk.get('source', 'unknown')}] {content_preview}")
 
     # Ingest the actual note chunks
     memory_manager.add_chunks(real_chunks)
