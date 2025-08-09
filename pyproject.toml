@@ -185,6 +185,12 @@ ignore_errors = true
 module = ["app.core.vector_store.*"]
 disable_error_code = ["override"]
 
+[[tool.mypy.overrides]]
+# The Streamlit frontend imports libraries with partial/no type information.
+# Avoid CI failures due to missing/partial stubs for UI-only code.
+module = ["frontend.*"]
+disable_error_code = ["import-untyped"]
+
 # Coverage configuration
 [tool.coverage.run]
 source = ["app"]
