@@ -94,7 +94,7 @@ TEST_EMBEDDING_MODEL=text-embedding-3-large
 
 # Optional: Supabase (for chat history, users, permanent memories)
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-service-role-or-anon-key
+SUPABASE_KEY=your-secret-or-service-role-key
 ```
 
 ### 4. Initialize Vector Store (automatic)
@@ -158,7 +158,7 @@ Once the UI is running (Streamlit at http://localhost:8501), you can:
 
 ### 7. Supabase Persistence (Optional)
 
-If you want to persist chat history and permanent memories, set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env`. A suggested schema is provided in `app/core/knowledge_store.py` docstring. When enabled:
+If you want to persist chat history and permanent memories, set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env`. Use the Project API “Secret” key (new) or the legacy `service_role` key. Do not use the JWT signing secret. A suggested schema is provided in `app/core/knowledge_store.py` docstring. When enabled:
 
 -   Single-user by default: chats are stored under a single default session. You don’t need to manage session IDs.
 -   You can override the default with `SUPABASE_DEFAULT_SESSION_ID` if desired.
