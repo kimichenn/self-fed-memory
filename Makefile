@@ -61,7 +61,7 @@ format: ## Format code
 
 type-check: ## Run type checking
 	@echo "Running type checker..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; mypy app/)
+	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; mypy .)
 
 clean: ## Clean up build artifacts and cache
 	@echo "Cleaning up..."
@@ -74,7 +74,7 @@ clean: ## Clean up build artifacts and cache
 	@find . -type d -name __pycache__ -exec rm -rf {} +
 	@find . -type f -name "*.pyc" -delete
 
-check: lint type-check test ## Run all checks (lint, type-check, test)
+check: format lint type-check test ## Run all checks (format, lint, type-check, test)
 
 install-ui: ## Install UI dependencies for Streamlit/Gradio
 	@echo "Installing UI dependencies..."

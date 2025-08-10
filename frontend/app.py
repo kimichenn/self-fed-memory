@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from typing import Any, Literal, TypedDict, cast
 import uuid
 
 import requests
@@ -20,9 +21,7 @@ def _load_parse_markdown_file():
     """
     try:
         # Try the regular package import first
-        from app.ingestion.markdown_loader import (
-            parse_markdown_file as fn,  # type: ignore
-        )
+        from app.ingestion.markdown_loader import parse_markdown_file as fn
 
         return fn
     except Exception as err:
@@ -40,7 +39,7 @@ def _load_parse_markdown_file():
         module = importlib.util.module_from_spec(spec)
         # Make sure absolute imports inside the module work
         sys.modules[spec.name] = module
-        spec.loader.exec_module(module)  # type: ignore[attr-defined]
+        spec.loader.exec_module(module)
         return module.parse_markdown_file
 
 
@@ -68,14 +67,28 @@ st.session_state.setdefault("show_memory_inline", False)
 st.session_state.setdefault("show_settings_inline", False)
 
 
+class ChatMessage(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class Conversation(TypedDict, total=False):
+    key: str
+    title: str
+    history: list[ChatMessage]
+    session_id: str
+    remote_loaded: bool
+    dev_mode: bool
+
+
 # Conversations state
 def _new_conversation(
     title: str = "New chat", generate_session_id: bool = False
-) -> dict:
+) -> Conversation:
     return {
         "key": f"chat-{uuid.uuid4().hex[:8]}",
         "title": title,
-        "history": [],  # list of {role, content}
+        "history": [],
         # For a brand-new chat created by the user, generate a unique backend session id
         # so it does not load the default single-user history. For the very first
         # conversation on app load, leave this empty so we can resume the default session.
@@ -85,7 +98,7 @@ def _new_conversation(
             else ""
         ),
         "remote_loaded": False,
-        "dev_mode": st.session_state.get("dev_mode", False),
+        "dev_mode": cast(bool, st.session_state.get("dev_mode", False)),
     }
 
 
@@ -98,17 +111,19 @@ if not st.session_state["conversations"]:
     st.session_state.current_conv_key = conv["key"]
 
 
-def _get_current_conversation() -> dict:
-    key = st.session_state.get("current_conv_key", "")
-    conv = st.session_state.conversations.get(key)
-    if conv is None:
+def _get_current_conversation() -> Conversation:
+    key = cast(str, st.session_state.get("current_conv_key", ""))
+    existing = st.session_state.conversations.get(key)
+    if existing is None:
         # Fallback: create one
         conv = _new_conversation()
         st.session_state.conversations[conv["key"]] = conv
         st.session_state.current_conv_key = conv["key"]
+    else:
+        conv = cast(Conversation, existing)
     # Backfill missing keys for older conversations
     if "dev_mode" not in conv:
-        conv["dev_mode"] = st.session_state.get("dev_mode", False)
+        conv["dev_mode"] = cast(bool, st.session_state.get("dev_mode", False))
     return conv
 
 
@@ -118,7 +133,7 @@ def call_chat_api(
     conversation_history: str | None,
     session_id: str | None,
     dev_mode: bool,
-) -> str:
+) -> dict[str, Any]:
     url = f"{st.session_state.api_base}/chat"
     payload = {
         "question": question,
@@ -135,7 +150,7 @@ def call_chat_api(
         headers["x-api-key"] = st.session_state.api_auth_key
     resp = requests.post(url, json=payload, headers=headers, timeout=120)
     resp.raise_for_status()
-    data = resp.json()
+    data = cast(dict[str, Any], resp.json())
     return data
 
 
@@ -221,7 +236,7 @@ def render_settings_body():
 
 def _load_remote_history(
     session_id: str | None, dev_mode: bool
-) -> tuple[str | None, list[dict]]:
+) -> tuple[str | None, list[ChatMessage]]:
     if not st.session_state.store_chat:
         return (None, [])
     try:
@@ -244,12 +259,14 @@ def _load_remote_history(
         data = r.json()
         sid = data.get("session_id")
         msgs = data.get("messages") or []
-        converted = []
+        converted: list[ChatMessage] = []
         for m in msgs:
             role = m.get("role", "user")
             if role not in ("user", "assistant"):
                 continue
-            converted.append({"role": role, "content": m.get("content", "")})
+            # At this point role is guaranteed to be one of the expected literals
+            role_literal = cast(Literal["user", "assistant"], role)
+            converted.append({"role": role_literal, "content": m.get("content", "")})
         return (sid, converted)
     except Exception:
         return (None, [])
