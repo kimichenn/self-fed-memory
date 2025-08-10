@@ -164,7 +164,16 @@ These tests target the test-prefixed tables by passing `use_test_supabase=true` 
 
 ## UI dependencies are mandatory
 
-The Streamlit frontend is part of the test surface. If you installed via the lockfile or `make dev`, UI deps are already included. Otherwise:
+The Streamlit frontend is part of the test surface.
+
+-   If you installed via the lockfile or `make dev`, UI deps are already included.
+-   If you install extras directly, `.[test]` now includes UI deps, so the following works:
+
+```bash
+pip install -e ".[test]"
+```
+
+Alternatively, you can install the explicit UI extra:
 
 ```bash
 pip install -e ".[ui]"
