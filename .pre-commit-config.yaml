@@ -18,21 +18,21 @@ repos:
       hooks:
           - id: ruff
             name: ruff (lint)
-            entry: bash -lc '(. .venv/bin/activate 2>/dev/null || true; ruff check . --fix)'
+            entry: bash -c 'python -m ruff check . --fix'
             language: system
             types: [python]
             stages: [pre-commit]
 
           - id: ruff-format
             name: ruff (format)
-            entry: bash -lc '(. .venv/bin/activate 2>/dev/null || true; ruff format .)'
+            entry: bash -c 'python -m ruff format .'
             language: system
             types: [python]
             stages: [pre-commit]
 
           - id: mypy
             name: mypy
-            entry: bash -lc '(. .venv/bin/activate 2>/dev/null || true; mypy --config-file=pyproject.toml .)'
+            entry: bash -c 'python -m mypy --config-file=pyproject.toml .'
             language: system
             types: [python]
             pass_filenames: false
@@ -41,7 +41,7 @@ repos:
           # Run full automated test suite (unit + integration) on commit to match CI
           - id: pytest-all
             name: pytest (unit + integration)
-            entry: bash -lc '(. .venv/bin/activate 2>/dev/null || true; PYTHONPATH=. pytest -q -m "unit or integration" --maxfail=1)'
+            entry: bash -c 'PYTHONPATH=. python -m pytest -q -m "unit or integration" --maxfail=1'
             language: system
             pass_filenames: false
             stages: [pre-commit]

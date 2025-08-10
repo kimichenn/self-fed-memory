@@ -111,6 +111,39 @@ class MemoryRouter:
 
         return summary.as_dict()
 
+    def delete_all(self, target: str | None = None) -> dict[str, int]:
+        """Delete all items from one or both backends.
+
+        Args:
+          target: "pinecone", "supabase", or None for both
+        """
+        summary = RouteSummary()
+
+        if target in (None, "pinecone"):
+            try:
+                # Prefer vector store API if available
+                delete_all_fn = getattr(self.memory_manager.store, "delete_all", None)
+                if callable(delete_all_fn):
+                    delete_all_fn()
+                else:
+                    # Fallback: if no bulk delete, we cannot list IDs generically here
+                    # so we treat as best-effort no-op
+                    pass
+            except Exception:
+                pass
+
+        if target in (None, "supabase") and self.supabase is not None:
+            try:
+                delete_all_pm = getattr(
+                    self.supabase, "delete_all_permanent_memories", None
+                )
+                if callable(delete_all_pm):
+                    delete_all_pm()
+            except Exception:
+                pass
+
+        return summary.as_dict()
+
     def search(self, query: str, k: int = 5) -> dict[str, Any]:
         """Aggregate search across Pinecone (semantic) and Supabase (core facts).
 

@@ -85,3 +85,36 @@ def test_search_merges_supabase_and_vector_results():
     assert "combined" in result
     ids = [d["id"] for d in result["combined"]]
     assert "1" in ids and "2" in ids and "3" in ids
+
+
+def test_delete_all_routes_to_targets():
+    mm = _fake_memory_manager()
+    supa = MagicMock()
+    router = MemoryRouter(memory_manager=mm, supabase_store=supa)
+
+    # Provide delete_all hooks
+    mm.store.delete_all = MagicMock()
+    supa.delete_all_permanent_memories = MagicMock()
+
+    # Delete from both
+    router.delete_all(target=None)
+    mm.store.delete_all.assert_called_once()
+    supa.delete_all_permanent_memories.assert_called_once()
+
+    # Pinecone only
+    mm = _fake_memory_manager()
+    supa = MagicMock()
+    router = MemoryRouter(memory_manager=mm, supabase_store=supa)
+    mm.store.delete_all = MagicMock()
+    router.delete_all(target="pinecone")
+    mm.store.delete_all.assert_called_once()
+    supa.delete_all_permanent_memories.assert_not_called()
+
+    # Supabase only
+    mm = _fake_memory_manager()
+    supa = MagicMock()
+    router = MemoryRouter(memory_manager=mm, supabase_store=supa)
+    supa.delete_all_permanent_memories = MagicMock()
+    router.delete_all(target="supabase")
+    supa.delete_all_permanent_memories.assert_called_once()
+    assert not hasattr(mm.store, "delete_all") or not mm.store.delete_all.called

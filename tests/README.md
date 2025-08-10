@@ -71,10 +71,12 @@ tests/
 
 ### 1. Install Dependencies
 
-First, ensure you have the necessary testing packages installed:
+Prefer the pinned lock for deterministic CI/dev installs:
 
 ```bash
-pip install -e ".[test]"
+make dev                  # installs from requirements-dev.txt
+# or
+pip install -r requirements-dev.txt
 ```
 
 ### 2. Set Up Environment Variables
@@ -96,13 +98,13 @@ The `Makefile` provides convenient shortcuts for running different test categori
 These tests are fast, deterministic, and safe to run at any time. They are executed in CI/CD pipelines and **do not make real API calls**.
 
 ```bash
-# Run all unit and integration tests
+# Run all unit and integration tests (fast, hermetic)
 make test
 ```
 
 #### Manual Verification Tests
 
-**⚠️ Warning:** These tests use **real, paid APIs** and require your manual review of the output.
+**⚠️ Warning:** These tests use **real, paid APIs** and may persist data to your configured Supabase test tables. They require your manual review of the output.
 
 ```bash
 # Run all manual tests
@@ -136,6 +138,36 @@ pytest -m "integration"
 
 # Run a specific test file
 pytest tests/unit/test_time_weighted_retriever.py
+```
+
+## Live Supabase Integration Tests (Automatic when configured)
+
+Integration tests in `tests/integration/test_supabase_live.py` will run automatically when both `SUPABASE_URL` and `SUPABASE_KEY` are set. No extra opt-in flag is required.
+
+Requirements:
+
+-   `SUPABASE_URL` and `SUPABASE_KEY` set in your environment (e.g., via `.env`)
+-   Recommended: `TEST_SUPABASE_TABLE_PREFIX` (defaults to `test_`) to ensure isolation
+-   Recommended: `API_AUTH_KEY` for protected endpoints like `/permanent_memories/upsert` and `/chat/history`
+
+Example run:
+
+```bash
+export SUPABASE_URL=your-url
+export SUPABASE_KEY=your-key
+export TEST_SUPABASE_TABLE_PREFIX=test_
+export API_AUTH_KEY=test-api-key
+pytest -m "integration" -k supabase_live -q
+```
+
+These tests target the test-prefixed tables by passing `use_test_supabase=true` and use `x-api-key: $API_AUTH_KEY` for endpoints that require it. They perform best‑effort cleanup of test data at the end.
+
+## UI dependencies are mandatory
+
+The Streamlit frontend is part of the test surface. If you installed via the lockfile or `make dev`, UI deps are already included. Otherwise:
+
+```bash
+pip install -e ".[ui]"
 ```
 
 ## Manual Verification Explained

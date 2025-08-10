@@ -65,6 +65,11 @@ class PineconeVectorStore(LangchainPinecone, VectorStore):
         """Delete vectors by ID."""
         self.index.delete(ids=ids, namespace=self.cfg.pinecone_namespace)
 
+    def delete_all(self) -> None:
+        """Delete all vectors in the configured namespace."""
+        # Pinecone supports namespace-wide deletion by passing delete_all=True
+        self.index.delete(delete_all=True, namespace=self.cfg.pinecone_namespace)
+
     # ------------------------------------------------------------------
     # Compatibility helpers
     # ------------------------------------------------------------------

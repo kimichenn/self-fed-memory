@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.api.main import create_app
+from app.core.config import Settings
 
 pytestmark = pytest.mark.integration
 
@@ -50,15 +51,22 @@ def test_chat_with_store_chat_gracefully_works_without_supabase(monkeypatch):
     assert "answer" in data or "result" in data
 
 
-def test_permanent_memory_requires_supabase_config():
+def test_permanent_memory_upsert_requires_config_or_auth(monkeypatch):
     app = create_app()
     client = TestClient(app)
-    payload = {
-        "content": "Test permanent memory",
-    }
+    payload = {"content": "Test permanent memory"}
     r = client.post("/permanent_memories/upsert", json=payload)
-    assert r.status_code == 400
-    assert r.json()["detail"] == "Supabase is not configured"
+    # When Supabase is not configured, endpoint should reject
+    if not Settings().supabase_url or not Settings().supabase_key:
+        assert r.status_code == 400
+        assert r.json()["detail"] == "Supabase is not configured"
+    else:
+        # When Supabase is configured, it should require auth if API_AUTH_KEY is set
+        monkeypatch.setenv("API_AUTH_KEY", "test-key")
+        app2 = create_app()
+        client2 = TestClient(app2)
+        r2 = client2.post("/permanent_memories/upsert", json=payload)
+        assert r2.status_code == 401
 
 
 def test_chat_history_requires_supabase_config():

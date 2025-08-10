@@ -63,6 +63,23 @@ docker build -t self-fed-memory:latest .
 
 ```
 
+#### Pinned install (recommended)
+
+-   Use the lockfile for fast, deterministic installs:
+
+```bash
+# with your venv/conda env activated
+make dev           # installs from requirements-dev.txt and sets up git hooks
+# or
+pip install -r requirements-dev.txt
+```
+
+To update dependencies (and refresh the lock):
+
+```bash
+make lock-upgrade  # regenerates requirements-dev.txt from pyproject extras
+```
+
 ### 3. Environment Setup
 
 Create a `.env` file in the root directory:
@@ -144,7 +161,13 @@ while True:
 #### Option B: Web Interface
 
 ```bash
-# One command (starts API and UI; requires venv/conda activated)
+# First ensure dependencies are installed in your active env
+# (either of the following):
+#   make dev                  # installs from the lockfile (recommended)
+#   pip install -r requirements-dev.txt
+#   # or if you prefer extras (slower resolver): pip install -e ".[ui]"
+
+# Then start API and UI (requires venv/conda activated)
 make run
 
 # Or run via Docker Compose (no local Python needed)
@@ -155,6 +178,7 @@ Once the UI is running (Streamlit at http://localhost:8501), you can:
 
 -   Open the Settings (⚙) to configure Intelligent mode, API base URL, and persistence. "Store chat history (Supabase)" is enabled by default; the backend will simply ignore it if Supabase is not configured.
 -   Use the Memory Manager (🧠) → "Upload Markdown Files" to ingest `.md` files. The loader honors front‑matter and filename dates and chunks documents for retrieval. Uploaded items are indexed for vector search (Pinecone) and, for core types (preference/fact/profile), also persisted to Supabase when configured.
+-   In Memory Manager → "Delete Memories", you can delete by IDs or use "Delete ALL (with confirm)" which opens a confirmation dialog and lets you select target: both, Pinecone only, or Supabase only. The action respects the conversation's DEV/PROD mode toggle.
 
 ### 7. Supabase Persistence (Optional)
 
@@ -176,6 +200,7 @@ Vector retrieval remains in Pinecone; store any retrievable content via `/memori
 -   API supports:
     -   `POST /memories/upsert` with fields `type`, `category`, `route_to_vector`.
     -   `POST /memories/delete` with `target=pinecone|supabase|both`.
+    -   `POST /memories/delete_all` to wipe all memories in selected backend(s); respects `use_test_index` and `use_test_supabase` for DEV vs PROD separation.
     -   `GET /memories/search` merging Pinecone + Supabase (substring) results.
 
 #### Test/Prod toggles

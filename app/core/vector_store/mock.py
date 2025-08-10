@@ -115,3 +115,7 @@ class MockVectorStore(VectorStore):
     def clear(self) -> None:
         """Clear all documents (for testing)."""
         self._store.clear()
+
+    def delete_all(self) -> None:
+        """Delete all documents in the store."""
+        self._store.clear()

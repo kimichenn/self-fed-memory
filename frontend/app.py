@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 import importlib.util
 import os
 from pathlib import Path
@@ -7,6 +8,11 @@ import sys
 import tempfile
 from typing import Any, Literal, TypedDict, cast
 import uuid
+
+# Ensure PyYAML uses the pure-Python implementation to avoid platform-specific C-extension issues
+os.environ.setdefault("YAML_CEXT_DISABLED", "1")
+with suppress(Exception):
+    import yaml as _yaml  # noqa: F401
 
 import requests
 import streamlit as st
@@ -17,19 +23,34 @@ def _load_parse_markdown_file():
 
     When this file is named app.py, absolute import 'app.ingestion...' can fail
     with 'app is not a package'. We first try normal import; if it fails,
-    dynamically load the module by file path.
+    we ensure the repo root is on sys.path and remove any non-package 'app'
+    module from sys.modules, then retry. Finally, fall back to loading by file path.
     """
+    # 1) Try the regular package import first
     try:
-        # Try the regular package import first
+        from app.ingestion.markdown_loader import parse_markdown_file as fn
+
+        return fn
+    except Exception:
+        pass
+
+    # 2) Ensure proper import environment and retry
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    # If a non-package module named 'app' was loaded (e.g., this frontend/app.py),
+    # remove it so the real package at repo_root/app/ can be imported.
+    mod_app = sys.modules.get("app")
+    if mod_app is not None and not hasattr(mod_app, "__path__"):
+        del sys.modules["app"]
+
+    try:
         from app.ingestion.markdown_loader import parse_markdown_file as fn
 
         return fn
     except Exception as err:
-        # Ensure repo root is importable and fall back to loading by file path
-        repo_root = Path(__file__).resolve().parents[1]
-        if str(repo_root) not in sys.path:
-            sys.path.insert(0, str(repo_root))
-        # Fallback: load by absolute file path (avoids 'app' name collision)
+        # 3) Fallback: load by absolute file path (avoids 'app' name collision)
         loader_path = repo_root / "app" / "ingestion" / "markdown_loader.py"
         spec = importlib.util.spec_from_file_location(
             "self_memory_markdown_loader", str(loader_path)
@@ -43,7 +64,15 @@ def _load_parse_markdown_file():
         return module.parse_markdown_file
 
 
-parse_markdown_file = _load_parse_markdown_file()
+# Lazy-load the shared markdown parser to avoid any startup import issues
+_parse_markdown_file_cached = None
+
+
+def get_parse_markdown_file():
+    global _parse_markdown_file_cached
+    if _parse_markdown_file_cached is None:
+        _parse_markdown_file_cached = _load_parse_markdown_file()
+    return _parse_markdown_file_cached
 
 
 # --- Page config
@@ -54,8 +83,20 @@ st.set_page_config(page_title="Self-Fed Memory", page_icon="🧠", layout="wide"
 API_BASE_DEFAULT = os.environ.get("SELF_MEMORY_API", "http://localhost:8000")
 
 
+def _probe_backend_health(base: str) -> dict[str, Any] | None:
+    try:
+        r = requests.get(f"{base}/health", timeout=3)
+        if r.status_code == 200:
+            data = cast(dict[str, Any], r.json())
+            return data
+    except Exception:
+        return None
+    return None
+
+
 # Settings defaults
 st.session_state.setdefault("api_base", API_BASE_DEFAULT)
+st.session_state.setdefault("backend_health", _probe_backend_health(API_BASE_DEFAULT))
 st.session_state.setdefault("intelligent", True)
 st.session_state.setdefault("k", 5)
 st.session_state.setdefault(
@@ -187,6 +228,14 @@ def render_settings_body():
             key="api_base",
             help="Base URL for the backend API (defaults from SELF_MEMORY_API env).",
         )
+        health = _probe_backend_health(st.session_state.api_base)
+        if health:
+            ok = health.get("status") == "ok"
+            sb = health.get("supabase_configured")
+            auth = health.get("api_auth_required")
+            st.caption(
+                f"Backend health: {'OK' if ok else 'ERROR'} • Supabase: {'ON' if sb else 'OFF'} • API auth: {'ON' if auth else 'OFF'}"
+            )
         st.text_input(
             "API auth key (x-api-key)",
             value=st.session_state.api_auth_key,
@@ -202,15 +251,24 @@ def render_settings_body():
         )
 
     with tabs[2]:
+        bc = st.session_state.get("backend_health") or _probe_backend_health(
+            st.session_state.api_base
+        )
+        supa_ok = bool(bc and bc.get("supabase_configured"))
         st.toggle(
             "Store chat history (Supabase)",
             value=st.session_state.store_chat,
             key="store_chat",
+            disabled=not supa_ok,
             help=(
                 "When enabled and Supabase is configured, chat sessions/messages are persisted. "
                 "Core items extracted from conversations are routed to Supabase permanent memories."
             ),
         )
+        if not supa_ok:
+            st.caption(
+                "Supabase not configured on backend. Set SUPABASE_URL and SUPABASE_KEY in .env."
+            )
         # Single-user design: no explicit Session ID needed
 
     with tabs[3]:
@@ -253,7 +311,7 @@ def _load_remote_history(
             f"{st.session_state.api_base}/chat/history",
             params=params,
             headers=headers,
-            timeout=60,
+            timeout=5,
         )
         r.raise_for_status()
         data = r.json()
@@ -272,7 +330,42 @@ def _load_remote_history(
         return (None, [])
 
 
-def render_memory_manager_body():
+def _ensure_supabase_available() -> None:
+    # Only probe once per session
+    if st.session_state.get("supabase_available") is not None:
+        return
+    try:
+        headers = {}
+        if st.session_state.api_auth_key:
+            headers["x-api-key"] = st.session_state.api_auth_key
+        params: dict[str, object] = {
+            "limit": 1,
+            "use_test_supabase": bool(st.session_state.get("dev_mode", False)),
+        }
+        r = requests.get(
+            f"{st.session_state.api_base}/chat/history",
+            params=params,
+            headers=headers,
+            timeout=3,
+        )
+        if r.status_code == 200:
+            st.session_state.supabase_available = True
+        else:
+            # Treat 400 "Supabase is not configured" as unavailable; other errors as unavailable
+            # 401 may indicate API auth required; Supabase still available, but history will be blocked without a key
+            try:
+                msg = r.json().get("detail")
+            except Exception:
+                msg = None
+            if r.status_code == 400 and msg == "Supabase is not configured":
+                st.session_state.supabase_available = False
+            else:
+                st.session_state.supabase_available = False
+    except Exception:
+        st.session_state.supabase_available = False
+
+
+def render_memory_manager_body(in_dialog: bool = False):
     with st.expander("Upload Markdown Files", expanded=True):
         uploads = st.file_uploader(
             "Upload one or more Markdown files (.md)",
@@ -281,7 +374,7 @@ def render_memory_manager_body():
             key="md_uploads",
             help=(
                 "Files are parsed with the same markdown loader used by the backend: "
-                "front‑matter and filename dates are respected; documents are chunked for retrieval."
+                "front-matter and filename dates are respected; documents are chunked for retrieval."
             ),
         )
         colu1, colu2 = st.columns([1, 1])
@@ -323,8 +416,8 @@ def render_memory_manager_body():
                     ) as tmp:
                         tmp.write(uf.read())
                         tmp_path = tmp.name
-                    # Parse and map to API items
-                    for chunk in parse_markdown_file(tmp_path):
+                    # Parse and map to API items (lazy-load the parser)
+                    for chunk in get_parse_markdown_file()(tmp_path):
                         item = {
                             "id": chunk.get("id", ""),
                             "content": chunk.get("content", ""),
@@ -353,7 +446,7 @@ def render_memory_manager_body():
                     r = requests.post(
                         f"{st.session_state.api_base}/memories/upsert",
                         json=payload,
-                        timeout=120,
+                        timeout=20,
                     )
                     r.raise_for_status()
                     total_items = len(batched)
@@ -417,7 +510,7 @@ def render_memory_manager_body():
                 r = requests.post(
                     f"{st.session_state.api_base}/memories/upsert",
                     json=payload,
-                    timeout=60,
+                    timeout=15,
                 )
                 r.raise_for_status()
                 st.success(f"Upserted. Routing: {r.json().get('routing')}")
@@ -438,7 +531,7 @@ def render_memory_manager_body():
                 r = requests.get(
                     f"{st.session_state.api_base}/memories/search",
                     params=params,
-                    timeout=60,
+                    timeout=10,
                 )
                 r.raise_for_status()
                 data = r.json()
@@ -452,24 +545,92 @@ def render_memory_manager_body():
         target = st.selectbox(
             "Target", ["both", "pinecone", "supabase"], index=0, key="mem_delete_target"
         )
-        if st.button("Delete", type="secondary", key="mem_delete_btn"):
-            try:
-                ids = [s.strip() for s in ids_csv.split(",") if s.strip()]
-                payload = {
-                    "ids": ids,
-                    "use_test_index": bool(st.session_state.dev_mode),
-                    "use_test_supabase": bool(st.session_state.dev_mode),
-                    "target": None if target == "both" else target,
-                }
-                r = requests.post(
-                    f"{st.session_state.api_base}/memories/delete",
-                    json=payload,
-                    timeout=60,
-                )
-                r.raise_for_status()
-                st.success(f"Deleted: {len(ids)}. Routing: {r.json().get('routing')}")
-            except Exception as e:
-                st.error(f"Error: {e}")
+        col_del_ids, col_del_all = st.columns([1, 1])
+        with col_del_ids:
+            if st.button("Delete by IDs", type="secondary", key="mem_delete_btn"):
+                try:
+                    ids = [s.strip() for s in ids_csv.split(",") if s.strip()]
+                    if not ids:
+                        st.warning("Provide at least one ID to delete.")
+                    else:
+                        payload = {
+                            "ids": ids,
+                            "use_test_index": bool(st.session_state.dev_mode),
+                            "use_test_supabase": bool(st.session_state.dev_mode),
+                            "target": None if target == "both" else target,
+                        }
+                        r = requests.post(
+                            f"{st.session_state.api_base}/memories/delete",
+                            json=payload,
+                            timeout=10,
+                        )
+                        r.raise_for_status()
+                        st.success(
+                            f"Deleted: {len(ids)}. Routing: {r.json().get('routing')}"
+                        )
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        with col_del_all:
+            if st.button(
+                "Delete ALL (with confirm)", type="secondary", key="mem_delete_all_btn"
+            ):
+                # Show confirmation modal/dialog
+                def _confirm_delete_all_body():
+                    st.warning(
+                        "This will permanently delete ALL memories in the selected target(s)."
+                    )
+                    st.write(
+                        f"Mode: {'DEV (test Pinecone + test Supabase)' if st.session_state.dev_mode else 'PROD'}"
+                    )
+                    target_choice = st.selectbox(
+                        "Target to wipe",
+                        ["both", "pinecone", "supabase"],
+                        index=["both", "pinecone", "supabase"].index(target),
+                        key="mem_delete_all_target_confirm",
+                    )
+                    cols = st.columns([1, 1])
+                    with cols[0]:
+                        if st.button(
+                            "Confirm delete ALL",
+                            type="primary",
+                            key="confirm_delete_all_yes",
+                        ):
+                            try:
+                                payload = {
+                                    "use_test_index": bool(st.session_state.dev_mode),
+                                    "use_test_supabase": bool(
+                                        st.session_state.dev_mode
+                                    ),
+                                    "target": (
+                                        None
+                                        if target_choice == "both"
+                                        else target_choice
+                                    ),
+                                }
+                                r = requests.post(
+                                    f"{st.session_state.api_base}/memories/delete_all",
+                                    json=payload,
+                                    timeout=20,
+                                )
+                                r.raise_for_status()
+                                st.success(
+                                    f"Wipe complete. Routing: {r.json().get('routing')}"
+                                )
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+                    with cols[1]:
+                        st.button("Cancel", key="confirm_delete_all_no")
+
+                if dialog_decorator and not in_dialog:
+                    # Use modal dialog for confirmation
+                    @dialog_decorator("Confirm delete ALL memories")
+                    def _confirm_delete_all_dialog():
+                        _confirm_delete_all_body()
+
+                    _confirm_delete_all_dialog()
+                else:
+                    with st.expander("Confirm delete ALL", expanded=True):
+                        _confirm_delete_all_body()
 
 
 # --- Dialogs (use modal if available; fallback to inline display)
@@ -484,7 +645,7 @@ if dialog_decorator:
 
     @dialog_decorator("Memory Manager")
     def memory_manager_dialog():
-        render_memory_manager_body()
+        render_memory_manager_body(in_dialog=True)
 
     @dialog_decorator("Settings")
     def settings_dialog():
@@ -588,8 +749,14 @@ with st.sidebar:
         curr["history"] = []
         st.rerun()
 
-    # Optionally load remote history for this conversation
-    if st.session_state.store_chat and not curr.get("remote_loaded"):
+    # Detect Supabase availability once and only load remote history when available
+    if st.session_state.store_chat:
+        _ensure_supabase_available()
+    if (
+        st.session_state.store_chat
+        and st.session_state.get("supabase_available") is True
+        and not curr.get("remote_loaded")
+    ):
         sid, msgs = _load_remote_history(
             curr.get("session_id"),
             curr.get("dev_mode", st.session_state.get("dev_mode", False)),

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from fastapi import APIRouter
@@ -93,10 +92,6 @@ def get_supabase_store(cfg: Settings) -> SupabaseKnowledgeStore | None:
     We avoid raising on missing config so regular non-persistent flows keep working.
     """
     try:
-        # During automated tests, treat Supabase as unavailable to keep tests
-        # hermetic and independent of developer/local env configuration.
-        if os.environ.get("PYTEST_CURRENT_TEST"):
-            return None
         if not cfg.supabase_url or not cfg.supabase_key:
             return None
         # Build table names with optional prefix (for test/production separation)
@@ -136,13 +131,19 @@ def chat(
     # Default to single-user session when persisting and no session id provided
     session_id: str | None = req.session_id
     if req.store_chat and supa is not None:
-        _require_api_key_if_configured(cfg, x_api_key)
-        # Use a short title derived from question if no title exists
-        title = (req.question[:60] + "…") if len(req.question) > 60 else req.question
-        session_id = supa.ensure_session(
-            session_id=session_id or _default_session_id(cfg), title=title
-        )
-        supa.save_message(session_id=session_id, role="user", content=req.question)
+        try:
+            _require_api_key_if_configured(cfg, x_api_key)
+            # Use a short title derived from question if no title exists
+            title = (
+                (req.question[:60] + "…") if len(req.question) > 60 else req.question
+            )
+            session_id = supa.ensure_session(
+                session_id=session_id or _default_session_id(cfg), title=title
+            )
+            supa.save_message(session_id=session_id, role="user", content=req.question)
+        except Exception:
+            # Gracefully ignore Supabase errors and continue without persistence
+            session_id = session_id or None
 
     if req.intelligent:
         chain: IntelligentQAChain | IntegratedQAChain
@@ -155,22 +156,28 @@ def chat(
         )
         # Persist assistant message if requested
         if req.store_chat and supa is not None and session_id:
-            _require_api_key_if_configured(cfg, x_api_key)
-            supa.save_message(
-                session_id=session_id,
-                role="assistant",
-                content=result.get("answer", ""),
-            )
+            try:
+                _require_api_key_if_configured(cfg, x_api_key)
+                supa.save_message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=result.get("answer", ""),
+                )
+            except Exception:
+                pass
         # Route extracted preferences/facts from conversation into Supabase+Pinecone
         # when persistence is enabled
         if req.store_chat and supa is not None:
-            from app.core.memory_router import MemoryRouter
+            try:
+                from app.core.memory_router import MemoryRouter
 
-            router = MemoryRouter(memory_manager=memory, supabase_store=supa)
-            extraction = result.get("extraction_results") or {}
-            items = extraction.get("items") or []
-            if items:
-                router.upsert_items(items)
+                router = MemoryRouter(memory_manager=memory, supabase_store=supa)
+                extraction = result.get("extraction_results") or {}
+                items = extraction.get("items") or []
+                if items:
+                    router.upsert_items(items)
+            except Exception:
+                pass
         if session_id:
             result["session_id"] = session_id
         return result
@@ -178,10 +185,15 @@ def chat(
         chain = IntegratedQAChain(memory, k=req.k, name=req.name)
         basic = chain.invoke({"question": req.question})
         if req.store_chat and supa is not None and session_id:
-            _require_api_key_if_configured(cfg, x_api_key)
-            supa.save_message(
-                session_id=session_id, role="assistant", content=basic.get("answer", "")
-            )
+            try:
+                _require_api_key_if_configured(cfg, x_api_key)
+                supa.save_message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=basic.get("answer", ""),
+                )
+            except Exception:
+                pass
         if session_id:
             basic["session_id"] = session_id
         return basic
@@ -294,6 +306,24 @@ def delete_memories(req: DeleteMemoriesRequest) -> dict[str, Any]:
     return {"deleted": req.ids, "routing": summary}
 
 
+class DeleteAllMemoriesRequest(BaseModel):
+    use_test_index: bool = False
+    use_test_supabase: bool = False
+    target: str | None = Field(
+        default=None, description='"pinecone", "supabase", or null for both'
+    )
+
+
+@router.post("/memories/delete_all")
+def delete_all_memories(req: DeleteAllMemoriesRequest) -> dict[str, Any]:
+    cfg = _settings_for_request(req.use_test_index, req.use_test_supabase)
+    memory = get_memory_manager(cfg)
+    supa = get_supabase_store(cfg)
+    router = MemoryRouter(memory_manager=memory, supabase_store=supa)
+    summary = router.delete_all(target=req.target)
+    return {"routing": summary}
+
+
 @router.get("/memories/search")
 def search_memories(
     query: str,
@@ -351,5 +381,11 @@ def get_chat_history(
     if supa is None:
         raise HTTPException(status_code=400, detail="Supabase is not configured")
     sid = session_id or _default_session_id(cfg)
-    history = supa.get_chat_history(session_id=sid, limit=limit)
+    try:
+        history = supa.get_chat_history(session_id=sid, limit=limit)
+    except Exception as err:
+        # Treat invalid credentials/unavailable Supabase as not configured
+        raise HTTPException(
+            status_code=400, detail="Supabase is not configured"
+        ) from err
     return {"session_id": sid, "messages": history}

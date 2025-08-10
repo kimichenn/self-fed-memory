@@ -1,114 +1,108 @@
-.PHONY: setup test test-cov clean lint format type-check install-dev help dev run venv docker-build docker-up docker-down test-manual-list
+.PHONY: help venv install install-dev install-ui dev setup run api-dev ui-dev ingest-folder test test-cov test-manual test-manual-list lint format type-check check clean docker-build docker-up docker-down lock lock-upgrade
 
-# Tool-agnostic defaults (works with system Python, venv, or conda)
-PYTHON ?= python3
+PYTHON ?= python
 VENV_DIR ?= .venv
+PORT_API ?= 8000
+PORT_UI ?= 8501
+
+.DEFAULT_GOAL := help
 
 help: ## Show this help message
 	@echo "Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-venv: ## Create a local Python virtual environment in .venv (if missing)
-	@echo "Ensuring virtual environment exists at $(VENV_DIR) ..."
-	@([ -d "$(VENV_DIR)" ] || ($(PYTHON) -m venv $(VENV_DIR)))
-	@echo "Virtual environment ready. Activate with: source $(VENV_DIR)/bin/activate"
+venv: ## Create a local Python virtual environment in .venv (no-op if exists)
+	@[ -d "$(VENV_DIR)" ] || $(PYTHON) -m venv $(VENV_DIR)
+	@echo "Activate with: source $(VENV_DIR)/bin/activate"
 
-dev: venv ## One-step local dev setup (venv + dev/test/ui deps + hooks)
-	@echo "Installing development, test, and UI dependencies into $(VENV_DIR) ..."
-	@. $(VENV_DIR)/bin/activate; pip install -U pip
-	@. $(VENV_DIR)/bin/activate; pip install -e ".[dev,test,ui]"
-	@echo "Installing git hooks (pre-commit)..."
-	@. $(VENV_DIR)/bin/activate; pre-commit install
-	@. $(VENV_DIR)/bin/activate; pre-commit install --hook-type pre-push
-	@([ -f ".env" ] || (cp .env.example .env && echo ".env created from .env.example")) || true
-	@echo "Dev environment ready. To start the app, run: make run"
+install: ## Install the package (editable)
+	@$(PYTHON) -m pip install -U pip
+	@$(PYTHON) -m pip install -e .
 
-run: ## Start API and UI together (Ctrl+C to stop)
-	@echo "Starting FastAPI (8000) and Streamlit UI (8501)..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; \
-	 uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000 & echo $$! > .uvicorn.pid); \
-	 sleep 1; \
-	 (SELF_MEMORY_API=http://localhost:8000 streamlit run frontend/app.py || true); \
-	 (test -f .uvicorn.pid && kill `cat .uvicorn.pid` 2>/dev/null || true); rm -f .uvicorn.pid
+install-dev: ## Install dev + test dependencies
+	@$(PYTHON) -m pip install -U pip
+	@$(PYTHON) -m pip install -e ".[dev,test]"
 
-setup: ## Install the package and dependencies
-	@echo "Installing package in development mode..."
-	@pip install -e .
+install-ui: ## Install UI dependencies (Streamlit / Gradio)
+	@$(PYTHON) -m pip install -U pip
+	@$(PYTHON) -m pip install -e ".[ui]"
 
-install-dev: ## Install development dependencies
-	@echo "Installing development dependencies..."
-	@pip install -e ".[dev,test]"
+dev: ## Install dev, test, and UI deps; set up git hooks; create .env if missing
+	@$(PYTHON) -m pip install -U pip
+	@($(PYTHON) -m pip show pip-tools >/dev/null 2>&1 || $(PYTHON) -m pip install pip-tools)
+	@[ -f requirements-dev.txt ] || (echo "No requirements-dev.txt found; generating lock..." && $(MAKE) lock)
+	@$(PYTHON) -m pip install -r requirements-dev.txt
+	@$(PYTHON) -m pre_commit install
+	@$(PYTHON) -m pre_commit install --hook-type pre-push
+	@[ -f .env ] || (cp .env.example .env && echo ".env created from .env.example")
+	@echo "Dev environment ready. Start the app with: make run"
 
-test: ## Run all automated (unit and integration) tests
-	@echo "Running automated unit and integration tests..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; PYTHONPATH=. pytest -m "unit or integration")
+# Backwards-compat alias
+setup: install ## Install the package (editable)
 
-test-cov: ## Run automated tests with coverage report
-	@echo "Running automated tests with coverage..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; PYTHONPATH=. pytest -m "unit or integration" --cov=app --cov-report=term-missing --cov-report=html)
+api-dev: ## Start FastAPI dev server (uses current shell environment)
+	@YAML_CEXT_DISABLED=1 $(PYTHON) -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port $(PORT_API)
 
-test-manual: ## Run manual verification tests (requires API keys)
-	@echo "Running manual verification tests..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; PYTHONPATH=. pytest -m "manual" -s --tb=short -x)
+ui-dev: ## Start Streamlit UI (uses current shell environment)
+	@YAML_CEXT_DISABLED=1 SELF_MEMORY_API=http://localhost:$(PORT_API) $(PYTHON) -m streamlit run frontend/app.py --server.port $(PORT_UI)
 
-lint: ## Run linting
-	@echo "Running linter..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; ruff check .)
+run: ## Start API ($(PORT_API)) and UI ($(PORT_UI)) together; Ctrl+C to stop
+	@echo "Starting API on $(PORT_API) and UI on $(PORT_UI) using active environment..."
+	@(YAML_CEXT_DISABLED=1 $(PYTHON) -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port $(PORT_API) & echo $$! > .uvicorn.pid); \
+	sleep 1; \
+	(YAML_CEXT_DISABLED=1 SELF_MEMORY_API=http://localhost:$(PORT_API) $(PYTHON) -m streamlit run frontend/app.py --server.port $(PORT_UI) || true); \
+	(test -f .uvicorn.pid && kill `cat .uvicorn.pid` 2>/dev/null || true); rm -f .uvicorn.pid
 
-format: ## Format code
-	@echo "Formatting code..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; ruff format .)
+ingest-folder: ## Ingest a folder of Markdown documents (FOLDER=/path/to/notes)
+	@$(PYTHON) scripts/ingest_folder.py $(FOLDER)
 
-type-check: ## Run type checking
-	@echo "Running type checker..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; mypy .)
+test: ## Run unit + integration tests (fast, hermetic)
+	@$(PYTHON) -m pytest -m "unit or integration"
 
-clean: ## Clean up build artifacts and cache
-	@echo "Cleaning up..."
-	@rm -rf build/
-	@rm -rf dist/
-	@rm -rf *.egg-info/
-	@rm -rf htmlcov/
-	@rm -rf .coverage
-	@rm -rf .pytest_cache/
+test-cov: ## Run tests with coverage report
+	@$(PYTHON) -m pytest -m "unit or integration" --cov=app --cov-report=term-missing --cov-report=html:htmlcov
+
+test-manual: ## Run manual tests (real APIs; requires API keys)
+	@$(PYTHON) -m pytest -m manual -s --tb=short -x
+
+test-manual-list: ## List available manual tests
+	@$(PYTHON) -m pytest -q -m manual --collect-only | cat
+
+lint: ## Lint with ruff
+	@$(PYTHON) -m ruff check .
+
+format: ## Format with ruff
+	@$(PYTHON) -m ruff format .
+
+type-check: ## Type-check with mypy
+	@$(PYTHON) -m mypy .
+
+check: ## Run format, lint, type-check, and tests
+	@$(MAKE) format
+	@$(MAKE) lint
+	@$(MAKE) type-check
+	@$(MAKE) test
+
+clean: ## Remove build, cache, and coverage artifacts
+	@rm -rf build/ dist/ *.egg-info/ htmlcov/ .coverage .pytest_cache/
 	@find . -type d -name __pycache__ -exec rm -rf {} +
 	@find . -type f -name "*.pyc" -delete
 
-check: format lint type-check test ## Run all checks (format, lint, type-check, test)
-
-install-ui: ## Install UI dependencies for Streamlit/Gradio
-	@echo "Installing UI dependencies..."
-	@pip install -e ".[ui]"
-
-dev-setup: install-dev ## Complete development setup
-	@echo "Setting up development environment..."
-	@pre-commit install
-	@pre-commit install --hook-type pre-push
-	@echo "Development environment ready!"
-
-# Ingestion shortcuts
-ingest-folder: ## Ingest a folder of documents (usage: make ingest-folder FOLDER=/path/to/folder)
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; python scripts/ingest_folder.py $(FOLDER))
-
-# API shortcuts
-api-dev: ## Start FastAPI development server
-	@echo "Starting FastAPI development server..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000)
-
-ui-dev: ## Start Streamlit UI development server
-	@echo "Starting Streamlit development server..."
-	@(. $(VENV_DIR)/bin/activate 2>/dev/null || true; streamlit run frontend/app.py)
-
-test-manual-list: ## List available manual tests
-	@echo "Listing manual tests (pytest collection):"
-	@PYTHONPATH=. pytest -q -m manual --collect-only | cat
-
-# Docker helpers (optional)
-docker-build: ## Build Docker image for API/UI
+docker-build: ## Build Docker image
 	@docker build -t self-fed-memory:latest .
 
-docker-up: ## Run API (8000) and UI (8501) via Docker Compose
+docker-up: ## Run via Docker Compose
 	@docker compose up --build
 
 docker-down: ## Stop Docker Compose services
 	@docker compose down
+
+lock: ## Generate pinned requirements-dev.txt from pyproject extras (dev,test,ui)
+	@$(PYTHON) -m pip install -U pip
+	@($(PYTHON) -m pip show piptools >/dev/null 2>&1 || $(PYTHON) -m pip install pip-tools)
+	@$(PYTHON) -m piptools compile --resolver=backtracking --extra dev --extra test --extra ui -o requirements-dev.txt $(CURDIR)/pyproject.toml
+
+lock-upgrade: ## Recompute lock and upgrade pins
+	@$(PYTHON) -m pip install -U pip
+	@($(PYTHON) -m pip show piptools >/dev/null 2>&1 || $(PYTHON) -m pip install pip-tools)
+	@$(PYTHON) -m piptools compile --resolver=backtracking --upgrade --extra dev --extra test --extra ui -o requirements-dev.txt $(CURDIR)/pyproject.toml

@@ -6,9 +6,13 @@ import os
 from pathlib import Path
 
 from _pytest.monkeypatch import MonkeyPatch
+from dotenv import load_dotenv
 import pytest
 
 from app.core.config import Settings
+
+# Ensure .env is loaded for tests, mirroring backend Settings behavior.
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Automatic test markers based on path

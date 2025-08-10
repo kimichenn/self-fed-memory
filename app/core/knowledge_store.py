@@ -225,3 +225,20 @@ class SupabaseKnowledgeStore:
             return True
         except Exception:
             return False
+
+    def delete_all_permanent_memories(self) -> bool:
+        """Delete all permanent memories.
+
+        Returns True if the delete was attempted without raising an exception.
+        """
+        try:
+            # Supabase requires a filter for delete; use a tautology to delete all rows
+            (
+                self.client.table(self.tables.permanent_memories)
+                .delete()
+                .neq("id", "")
+                .execute()
+            )
+            return True
+        except Exception:
+            return False
