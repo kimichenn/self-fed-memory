@@ -2,6 +2,8 @@
 
 A personalized AI assistant with long-term memory that learns from your notes, conversations, and experiences. Built with retrieval-augmented generation (RAG) to provide personalized responses grounded in your own knowledge base.
 
+⚠️ Work in Progress: This repo is still under development. The UI and per-chat saves are partially implemented; expect bugs.
+
 ## Overview
 
 This system ingests your personal notes and documents, converts them into semantic embeddings stored in a vector database, and uses GPT-4.1 to answer questions with full context of your life, preferences, and experiences. Think of it as "ChatGPT with perfect memory of who you are."
